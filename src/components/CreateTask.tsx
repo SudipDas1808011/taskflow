@@ -1,23 +1,11 @@
 "use client";
 import { useState } from "react";
 import { postTask } from "@/services/taskService";
+import { TaskItem } from "@/types/types";
 
-type Task = {
-  name: string;
-  date: string;
-  time: string;
-  description: string;
-  isCompleted: boolean;
-};
-
-export default function CreateTask() {
-  const [task, setTask] = useState<Task>({
-    name: "",
-    date: "",
-    time: "",
-    description: "",
-    isCompleted: false,
-  });
+export default function CreateTask({ onCreated }: { onCreated: () => void }) {
+  const [task, setTask] = useState<Partial<TaskItem>>({});
+  const [loading, setLoading] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -31,17 +19,18 @@ export default function CreateTask() {
   };
 
   const handleSubmit = async () => {
-    if (!task.name || !task.date || !task.time) {
+    if (!task.name || !task.dueDate || !task.dueTime) {
       alert("Please fill all required fields");
       return;
     }
-
+    setLoading(true);
     try {
       const response = await postTask(task);
 
       if (response.ok) {
-        alert("Task saved successfully!");
-        setTask({ name: "", date: "", time: "", description: "" ,isCompleted:false});
+        setTask({ name: "", dueDate: "", dueTime: "", description: "", isCompleted: false });
+        setLoading(false);
+        onCreated();
       } else {
         alert("Something went wrong on the server.");
       }
@@ -52,7 +41,7 @@ export default function CreateTask() {
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      
+
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-4 shadow-md text-center sm:text-left">
         <h2 className="text-white font-bold text-lg tracking-tight">
@@ -75,7 +64,7 @@ export default function CreateTask() {
             type="text"
             name="name"
             placeholder="e.g. Project Review"
-            value={task.name}
+            value={task.name || ""}
             onChange={handleChange}
             className="w-full border-2 border-slate-100 bg-white p-2.5 text-sm rounded-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-400"
           />
@@ -90,9 +79,9 @@ export default function CreateTask() {
             </label>
             <input
               type="date"
-              name="date"
+              name="dueDate"
               min={today}
-              value={task.date}
+              value={task.dueDate || ""}
               onChange={handleChange}
               className="w-full border-2 border-slate-100 bg-white p-2.5 text-sm rounded-lg focus:border-indigo-500 outline-none transition-all"
             />
@@ -104,8 +93,8 @@ export default function CreateTask() {
             </label>
             <input
               type="time"
-              name="time"
-              value={task.time}
+              name="dueTime"
+              value={task.dueTime || ""}
               onChange={handleChange}
               className="w-full border-2 border-slate-100 bg-white p-2.5 text-sm rounded-lg focus:border-indigo-500 outline-none transition-all"
             />
@@ -120,7 +109,7 @@ export default function CreateTask() {
           <textarea
             name="description"
             placeholder="Outline the steps or goals for this task..."
-            value={task.description}
+            value={task.description || ""}
             onChange={handleChange}
             className="w-full flex-1 border-2 border-slate-100 bg-white p-3 text-sm rounded-lg resize-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
           />
@@ -130,9 +119,10 @@ export default function CreateTask() {
         <div className="flex flex-col items-center gap-3 pt-4 border-t border-slate-200">
           <button
             onClick={handleSubmit}
-            className="w-full sm:w-64 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center"
+            disabled={loading}
+            className="w-full sm:w-64 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-bold rounded-lg shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center"
           >
-            Create Task
+            {loading ? "Creating..." : "Create Task"}
           </button>
 
           <span className="text-[11px] text-slate-400 font-medium text-center">
