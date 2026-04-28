@@ -24,6 +24,7 @@ export function Stats() {
 
 export function History({ refresh }: { refresh: boolean }) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [activeTab, setActiveTab] = useState<"completed" | "due">("completed");
 
   useEffect(() => {
     const loadTasks = async () => {
@@ -48,7 +49,6 @@ export function History({ refresh }: { refresh: boolean }) {
 
   const dueTasks = tasks.filter((t) => {
     if (t.isCompleted) return false;
-
     const taskDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
     return taskDateTime < now;
   });
@@ -64,88 +64,103 @@ export function History({ refresh }: { refresh: boolean }) {
     }
   };
 
-  return (
-    <div className="w-full bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 ml-1 tracking-wider uppercase">
-              Task History
-            </label>
-            <div className="h-0.5 w-12 bg-indigo-600 rounded-full mt-1 ml-1"></div>
-          </div>
+  const renderTasks = (list: TaskItem[], type: "completed" | "due") => {
+    return list.map((item, index) => (
+      <li
+        key={item._id}
+        className="flex items-center justify-between gap-4 bg-white p-3 rounded-lg border border-slate-100 shadow-sm"
+      >
+        <div className="flex items-center gap-3 overflow-hidden">
+          <span className="font-bold text-indigo-600 text-xs">
+            {index + 1}.
+          </span>
+
+          <span className="font-medium text-sm text-slate-700 truncate flex items-center gap-2">
+            {item.name}
+
+            <span className="text-[10px] text-slate-400 whitespace-nowrap">
+              {item.dueDate} at {item.dueTime}
+            </span>
+          </span>
         </div>
 
-        <div className="max-h-[350px] overflow-y-auto pr-1">
-        <ul className="flex flex-col gap-2">
-          {/* Completed Tasks */}
-          {completedTasks.map((item, index) => (
-            <li
-              key={item._id}
-              className="flex items-center justify-between gap-4 bg-white p-3 rounded-lg border border-slate-100 shadow-sm"
+        {type === "completed" ? (
+          <div
+            className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle(
+              "success"
+            )}`}
+          >
+            Completed
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div
+              className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle(
+                "due"
+              )}`}
             >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <span className="font-bold text-indigo-600 text-xs">
-                  {index + 1}.
-                </span>
+              Due
+            </div>
 
-                <span className="font-medium text-sm text-slate-700 truncate flex items-center gap-2">
-                  {item.name}
-
-                  <span className="text-[10px] text-slate-400 font-normal whitespace-nowrap">
-                    {item.dueDate} at {item.dueTime}
-                  </span>
-                </span>
-              </div>
-
-              <div
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle("success")}`}
-              >
-                Completed
-              </div>
-            </li>
-          ))}
-
-          {/* Due Tasks */}
-          {dueTasks.map((item, index) => (
-            <li
-              key={item._id}
-              className="flex items-center justify-between gap-4 bg-white p-3 rounded-lg border border-slate-100 shadow-sm"
+            <button
+              onClick={() => handleRetry(item)}
+              className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
             >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <span className="font-bold text-indigo-600 text-xs">
-                  {index + 1}.
-                </span>
+              Retry
+            </button>
+          </div>
+        )}
+      </li>
+    ));
+  };
 
-                <span className="font-medium text-sm text-slate-700 truncate flex items-center gap-2">
-                  {item.name}
+  return (
+    <div className="w-full bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
 
-                  <span className="text-[10px] text-slate-400 font-normal whitespace-nowrap">
-                    {item.dueDate} at {item.dueTime}
-                  </span>
-                </span>
-              </div>
+      {/* Header + Tabs */}
+      <div className="p-5">
+        <div className="mb-3">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Task History
+          </label>
+        </div>
 
-              <div className="flex items-center gap-2">
-                <div
-                  className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle("due")}`}
-                >
-                  Due
-                </div>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab("completed")}
+            className={`px-3 py-1 text-xs rounded-md border transition ${
+              activeTab === "completed"
+                ? "bg-emerald-500 text-white border-emerald-500"
+                : "bg-white text-slate-600 border-slate-200"
+            }`}
+          >
+            Completed
+          </button>
 
-                <button
-                  onClick={() => handleRetry(item)}
-                  className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-                >
-                  Retry
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+          <button
+            onClick={() => setActiveTab("due")}
+            className={`px-3 py-1 text-xs rounded-md border transition ${
+              activeTab === "due"
+                ? "bg-rose-500 text-white border-rose-500"
+                : "bg-white text-slate-600 border-slate-200"
+            }`}
+          >
+            Due Tasks
+          </button>
+        </div>
+
+        {/* Scrollable list */}
+        <div className="max-h-[380px] overflow-y-auto pr-1">
+          <ul className="flex flex-col gap-2">
+            {activeTab === "completed"
+              ? renderTasks(completedTasks, "completed")
+              : renderTasks(dueTasks, "due")}
+          </ul>
         </div>
       </div>
 
+      {/* Footer */}
       <div className="bg-slate-100/50 px-5 py-2 border-t border-slate-200">
         <p className="text-[10px] text-slate-400 font-medium italic">
           Last updated: Just now
