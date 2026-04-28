@@ -22,7 +22,7 @@ export function Stats() {
   );
 }
 
-export function History({ refresh }: { refresh: boolean }) {
+export function History({ refresh,onRetry, }: { refresh: boolean, onRetry: (task: TaskItem) => void; }) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [activeTab, setActiveTab] = useState<"completed" | "due">("completed");
 
@@ -39,11 +39,7 @@ export function History({ refresh }: { refresh: boolean }) {
     loadTasks();
   }, [refresh]);
 
-  const handleRetry = (task: TaskItem) => {
-    console.log("Retry clicked for:", task);
-  };
-
-  const now = new Date();
+   const now = new Date();
 
   const completedTasks = tasks
   .filter((t) => t.isCompleted)
@@ -109,12 +105,12 @@ export function History({ refresh }: { refresh: boolean }) {
               Due
             </div>
 
-            <button
-              onClick={() => handleRetry(item)}
-              className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-            >
-              Retry
-            </button>
+           <button
+  onClick={() => onRetry(item)}
+  className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+>
+  Retry
+</button>
           </div>
         )}
       </li>
