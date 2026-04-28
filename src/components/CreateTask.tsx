@@ -1,13 +1,47 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { postTask } from "@/services/taskService";
 import { TaskItem } from "@/types/types";
 
-export default function CreateTask({ onCreated }: { onCreated: () => void }) {
-  const [task, setTask] = useState<Partial<TaskItem>>({});
+type CreateTaskProps = {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+  initialData: TaskItem | null;
+};
+
+export default function CreateTask({
+  open,
+  onClose,
+  onCreated,
+  initialData,
+}: CreateTaskProps) {
+  const [task, setTask] = useState<Partial<TaskItem>>(() => ({
+  name: initialData?.name || "",
+  dueDate: initialData?.dueDate || "",
+  dueTime: initialData?.dueTime || "",
+  description: initialData?.description || "",
+  isGoal: initialData?.isGoal || false,
+  isCompleted: false,
+}));
+
   const [loading, setLoading] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
+
+
+  useEffect(() => {
+  if (initialData) {
+    setTask({
+      name: initialData.name,
+      dueDate: initialData.dueDate,
+      dueTime: initialData.dueTime,
+      description: initialData.description,
+      isGoal: initialData.isGoal,
+      isCompleted: false,
+    });
+  }
+}, [initialData]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
