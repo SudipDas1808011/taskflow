@@ -45,7 +45,14 @@ export function History({ refresh }: { refresh: boolean }) {
 
   const now = new Date();
 
-  const completedTasks = tasks.filter((t) => t.isCompleted);
+  const completedTasks = tasks
+  .filter((t) => t.isCompleted)
+  .sort((a, b) => {
+    const aTime = new Date( `${a.dueDate}T${a.dueTime}`).getTime();
+    const bTime = new Date( `${b.dueDate}T${b.dueTime}`).getTime();
+
+    return bTime - aTime;
+  });
 
   const dueTasks = tasks.filter((t) => {
     if (t.isCompleted) return false;
