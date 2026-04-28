@@ -28,7 +28,7 @@ export default function CreateTask({ onCreated }: { onCreated: () => void }) {
       const response = await postTask(task);
 
       if (response.ok) {
-        setTask({ name: "", dueDate: "", dueTime: "", description: "", isCompleted: false });
+        setTask({ name: "", dueDate: "", dueTime: "", description: "", isGoal:false, isCompleted: false });
         setLoading(false);
         onCreated();
       } else {
