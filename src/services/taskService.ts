@@ -32,3 +32,41 @@ export const getTasks = async () => {
     throw error;
   }
 };
+
+export const updateTask = async (id: string, data: any) => {
+  const res = await fetch(`/api/tasks/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+ if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || "Update failed");
+  }
+
+  return res.json();
+};
+
+export const deleteTask = async (id: string) => {
+    try {
+        const res = await fetch(`/api/tasks/${id}`, {
+            method: "DELETE",
+        });
+
+        console.log("Delete API response:", res);
+
+        const data = await res.json();
+        console.log("Delete response data:", data);
+
+        if (!res.ok) {
+            throw new Error(data.message);
+        }
+
+        console.log("Task deleted successfully");
+    } catch (error) {
+        console.error("Error deleting task:", error);
+    }
+};
