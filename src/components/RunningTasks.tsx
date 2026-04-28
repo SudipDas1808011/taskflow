@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TaskItem } from "@/types/types";
-import { getTasks, updateTask } from "@/services/taskService";
+import { getTasks, updateTask , deleteTask } from "@/services/taskService";
 
 export default function RunningTasks({ refresh }: { refresh: boolean }) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -43,6 +43,30 @@ export default function RunningTasks({ refresh }: { refresh: boolean }) {
     }
   };
 
+  const handleDelete = async (task: TaskItem) => {
+    console.log("Delete button clicked for task:", task);
+
+    try {
+        if(task._id){
+          const res = await deleteTask(task._id);
+
+        console.log("DeleteTask response:", res);
+        
+        setTasks((prev) => {
+            const updated = prev.filter((t) => t._id !== task._id);
+            console.log("Updated task list:", updated);
+            return updated;
+        });
+
+        console.log("Task deleted successfully:", task._id);
+        }else{
+          console.error("task id not found or task is undefined");
+        }
+    } catch (error) {
+        console.error("Error deleting task:", error);
+    }
+};
+
   return (
     <div className="w-full h-full flex flex-col bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-4 shadow-md">
@@ -51,7 +75,6 @@ export default function RunningTasks({ refresh }: { refresh: boolean }) {
       </div>
 
       <div className="p-4 flex flex-col gap-3 flex-1 overflow-y-auto">
-        
         {tasks.map((task, index) => (
           <div
             key={task._id}
@@ -66,8 +89,8 @@ export default function RunningTasks({ refresh }: { refresh: boolean }) {
               <div className="flex flex-col relative">
                 <span className="text-sm font-semibold text-slate-700 relative inline-block">
                   {task.name}
-                 
-                  <div 
+
+                  <div
                     className={`absolute top-1/2 left-0 h-[1.5px] bg-slate-500 transition-all duration-[1500ms] ease-out
                     ${task.isCompleted ? "w-full opacity-100" : "w-0 opacity-0"}`}
                   />
@@ -79,6 +102,14 @@ export default function RunningTasks({ refresh }: { refresh: boolean }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <button onClick={() => handleDelete(task)} 
+              className="p-2 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 active:bg-red-200 transition duration-200 ease-in-out" aria-label="Delete task">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+
               {!task.isGoal && (
                 <button
                   onClick={() => handleToggle(task)}
