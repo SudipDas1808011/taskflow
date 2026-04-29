@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import clientPromise from "@/lib/mongodb";
+import { contentPrompt, matchPrompt } from "@/utils/prompt";
 import OpenAI from "openai";
-import { contentPrompt } from "@/utils/prompt"
+
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -13,37 +15,140 @@ export async function POST(req: Request) {
 
     console.log("User input:", lastMessage);
 
-    const completion = await client.chat.completions.create({
+    // =========================
+    // STEP 1: INTENT DETECTION
+    // =========================
+    const intentRes = await client.chat.completions.create({
       model: "gpt-4o-mini",
-
       response_format: { type: "json_object" },
-
       messages: [
         {
           role: "system",
-          content: `${contentPrompt}`,
+          content: contentPrompt,
         },
-
-        ...messages.map((m: any) => ({
-          role: m.role === "user" ? "user" : "assistant",
-          content: m.text,
-        })),
+        {
+          role: "user",
+          content: lastMessage,
+        },
       ],
-
       temperature: 0.3,
     });
 
-    const raw = completion.choices[0].message.content;
+    const intentRaw = intentRes.choices[0].message.content;
+    console.log("Intent raw:", intentRaw);
 
-    console.log("AI raw response:", raw);
+    const intent = JSON.parse(intentRaw || "{}");
+    console.log("Parsed intent:", intent);
 
-    return NextResponse.json(JSON.parse(raw || "{}"));
+    const operation = intent?.operation;
+
+    // =========================
+    // STEP 2: ADD FLOW
+    // =========================
+    if (intent.type === "task" && operation === "add") {
+      return NextResponse.json({
+        type: "task",
+        intent,
+        match: null,
+        reply: intent.reply || "Task created"
+      });
+    }
+
+    // =========================
+    // STEP 3: DELETE / RETRY / COMPLETE FLOW (MATCHING)
+    // =========================
+    if (
+      intent.type === "task" &&
+      (operation === "delete" ||
+        operation === "retry" ||
+        operation === "complete")
+    ) {
+      const email = req.headers.get("email");
+
+      if (!email) {
+        return NextResponse.json(
+          {
+            type: "error",
+            intent,
+            match: null,
+            reply: "Unauthorized"
+          },
+          { status: 401 }
+        );
+      }
+
+      const mongoClient = await clientPromise;
+      const db = mongoClient.db("taskdb");
+
+      const user = await db.collection("users").findOne({ email });
+      const tasks = user?.tasks || [];
+
+      console.log("Sending tasks for matching:", tasks);
+
+      if (tasks.length === 0) {
+        return NextResponse.json({
+          type: "task",
+          intent,
+          match: null,
+          reply: "No tasks found to match"
+        });
+      }
+
+      const matchRes = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: matchPrompt,
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              query: intent.data.query,
+              tasks,
+              operation
+            }),
+          },
+        ],
+        temperature: 0.2,
+      });
+
+      const matchRaw = matchRes.choices[0].message.content;
+      console.log("Match raw:", matchRaw);
+
+      const match = JSON.parse(matchRaw || "{}");
+      console.log("Matched task:", match);
+
+      return NextResponse.json({
+        type: "task",
+        intent,
+        match,
+        reply: match?.message || intent.reply || "OK"
+      });
+    }
+
+    // =========================
+    // STEP 4: CHAT / FALLBACK
+    // =========================
+    return NextResponse.json({
+      type: intent.type || "chat",
+      intent,
+      match: null,
+      reply: intent.reply || "OK"
+    });
+
   } catch (error) {
     console.error("AI API error:", error);
 
     return NextResponse.json(
-      { reply: "Something went wrong with AI", type: "error" },
-      { status: 500 },
+      {
+        type: "error",
+        reply: "Something went wrong with AI",
+        intent: null,
+        match: null
+      },
+      { status: 500 }
     );
   }
 }
