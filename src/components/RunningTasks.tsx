@@ -95,7 +95,7 @@ export default function RunningTasks({
       setActiveTab("tasks");
     }
     setPrevTaskCount(tasks.length);
-  }, [tasks]);
+  }, [tasks, activeTab, prevTaskCount]);
 
   const handleToggle = async (task: TaskItem) => {
     if (!task.id) return;
@@ -142,8 +142,6 @@ export default function RunningTasks({
         isGoal ? "goal" : "task"
       );
 
-      console.log("after await response - delete success");
-
       setTimeout(() => {
         if (isGoal) {
           setGoals((prev) => prev.filter((g) => g.id !== item.id));
@@ -155,14 +153,11 @@ export default function RunningTasks({
       }, 300);
     } catch (err) {
       console.log("delete error:", err);
-
       setAnimatingIds((prev) => prev.filter((id) => id !== item.id));
     }
   };
 
   function handleDetails(goal: any) {
-    console.log("Raw goal clicked:", goal);
-
     const formattedGoal = {
       id: goal.id,
       title: goal.title || goal.name,
@@ -170,42 +165,43 @@ export default function RunningTasks({
       days: goal.days ?? [],
     };
 
-    console.log("Formatted goal sent to modal:", formattedGoal);
-
     setSelectedGoal(formattedGoal);
     setOpenModal(true);
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-slate-50 border rounded-xl overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-4">
-        <h2 className="text-white font-bold text-lg">Running Tasks</h2>
+      <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <h2 className="text-slate-900 font-bold text-lg tracking-tight">Running Tasks</h2>
+        <div className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+          Live Feed
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b bg-white">
+      <div className="flex bg-slate-50/50 p-1 mx-4 mt-4 rounded-xl border border-slate-200">
         <button
           onClick={() => setActiveTab("tasks")}
-          className={`flex-1 p-2 text-sm font-semibold ${
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
             activeTab === "tasks"
-              ? "border-b-2 border-indigo-600 text-indigo-600"
-              : "text-slate-500"
+              ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200"
+              : "text-slate-500 hover:text-slate-700"
           }`}
         >
-          Tasks
+          Individual Tasks
         </button>
 
         <button
           onClick={() => setActiveTab("goals")}
-          className={`flex-1 p-2 text-sm font-semibold ${
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
             activeTab === "goals"
-              ? "border-b-2 border-indigo-600 text-indigo-600"
-              : "text-slate-500"
+              ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200"
+              : "text-slate-500 hover:text-slate-700"
           }`}
         >
-          Goals
+          Long-term Goals
         </button>
       </div>
 
@@ -213,73 +209,99 @@ export default function RunningTasks({
       <div className="p-4 flex flex-col gap-3 flex-1 overflow-y-auto">
 
         {loading ? (
-          <div className="text-center text-slate-400">Loading...</div>
+          <div className="flex flex-col items-center justify-center h-full gap-2 py-10">
+            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-widest">Updating...</span>
+          </div>
         ) : activeTab === "tasks" ? (
+          tasks.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 text-xs italic">No pending tasks found.</div>
+          ) : (
           tasks.map((task, index) => (
             <div
               key={task.id || index}
-              className={`flex justify-between p-3 bg-white border rounded-lg transition-all ${
-                animatingIds.includes(task.id || "")
-                  ? "opacity-0 scale-95"
-                  : "opacity-100"
+              className={`group flex items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-500/5 transition-all duration-300 ${
+                animatingIds.includes(task.id || "") ? "opacity-0 scale-95 translate-x-4" : "opacity-100"
               }`}
             >
-              <div>
-                <div className="font-semibold text-sm">
-                  {task.title || task.name}
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="font-bold text-slate-800 text-sm truncate group-hover:text-indigo-600 transition-colors">
+                  {task.name}
                 </div>
-                <div className="text-xs text-slate-400">
-                  {task.dueDate} {task.dueTime}
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase">
+                    {task.dueDate} • {task.dueTime}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <button onClick={() => handleDelete(task)}>✕</button>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => handleDelete(task)}
+                  className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                  title="Remove Task"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
 
                 <button
                   onClick={() => handleToggle(task)}
-                  className="w-6 h-6 border rounded"
+                  className="group/check w-10 h-10 flex items-center justify-center bg-slate-50 border-2 border-slate-100 rounded-xl hover:bg-indigo-600 hover:border-indigo-600 transition-all duration-300 shadow-sm"
+                  title="Mark as Done"
                 >
-                  ✓
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-400 group-hover/check:text-white group-hover/check:scale-110 transition-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 </button>
               </div>
             </div>
           ))
+          )
         ) : (
+          goals.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 text-xs italic">No active goals found.</div>
+          ) : (
           goals.map((goal: any, index) => (
             <div
               key={goal.id || index}
-              className="flex justify-between p-3 bg-white border rounded-lg"
+              className="group flex items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:border-violet-200 transition-all duration-300 shadow-sm hover:shadow-violet-500/5"
             >
-              <div>
-                <div className="font-semibold text-sm">{goal.title}</div>
-                <div className="text-xs text-slate-400">
-                  {goal.description}
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="font-bold text-slate-800 text-sm truncate">{goal.title}</div>
+                <div className="text-[11px] text-slate-400 mt-1 line-clamp-1 italic font-medium">
+                  {goal.description || "No description provided"}
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <button onClick={() => handleDelete(goal, true)}>
-                  ✕
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleDelete(goal, true)}
+                  className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                 </button>
 
                 <button
                   onClick={() => handleDetails(goal)}
-                  className="px-2 py-1 text-xs bg-indigo-500 text-white rounded"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-[11px] font-bold rounded-xl transition-all duration-300 ring-1 ring-indigo-100 hover:ring-indigo-600 shadow-sm"
                 >
-                  Details
+                  DETAILS
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                 </button>
               </div>
             </div>
           ))
+          )
         )}
       </div>
 
       {/* Footer */}
-      <div className="p-2 text-center text-xs text-slate-400 bg-white border-t">
-        {activeTab === "tasks"
-          ? `Showing ${tasks.length} tasks`
-          : `Showing ${goals.length} goals`}
+      <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          Status: {loading ? "Syncing" : "Up to date"}
+        </span>
+        <div className="text-[10px] font-extrabold text-indigo-500 bg-white px-2 py-1 rounded-md border border-slate-200">
+          {activeTab === "tasks" ? tasks.length : goals.length} Items
+        </div>
       </div>
 
       {/* Modal */}
