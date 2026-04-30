@@ -93,16 +93,22 @@ export const updateTask = async (
   return result;
 };
 
-export const deleteTask = async (email: string, taskId: string, token: string) => {
-  const res = await fetch(`/api/tasks`, {
+export const deleteTask = async (
+  email: string,
+  id: string,
+  token: string,
+  type: "task" | "goal" = "task"
+) => {
+  const res = await fetch(`/api/delete`, {
     method: "DELETE",
     headers: {
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${token}`,
-},
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({
       email,
-      taskId,
+      id,
+      type,
     }),
   });
 
@@ -110,6 +116,8 @@ export const deleteTask = async (email: string, taskId: string, token: string) =
 
   const result = await res.json();
   console.log("Delete response:", result);
+
+  console.log("after await response - deleteTask finished");
 
   if (!res.ok) {
     throw new Error(result.message || "Delete failed");

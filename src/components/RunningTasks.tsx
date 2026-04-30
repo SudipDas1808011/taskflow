@@ -129,44 +129,52 @@ export default function RunningTasks({
     }
   };
 
-  const handleDelete = async (task: TaskItem, isGoal = false) => {
-    if (!task.id) return;
+  const handleDelete = async (item: any, isGoal = false) => {
+    if (!item.id) return;
 
-    setAnimatingIds((prev) => [...prev, task.id!]);
+    setAnimatingIds((prev) => [...prev, item.id]);
 
     try {
-      await deleteTask(email, task.id, token);
+      await deleteTask(
+        email,
+        item.id,
+        token,
+        isGoal ? "goal" : "task"
+      );
+
+      console.log("after await response - delete success");
 
       setTimeout(() => {
         if (isGoal) {
-          setGoals((prev) => prev.filter((g) => g.id !== task.id));
+          setGoals((prev) => prev.filter((g) => g.id !== item.id));
         } else {
-          setTasks((prev) => prev.filter((t) => t.id !== task.id));
+          setTasks((prev) => prev.filter((t) => t.id !== item.id));
         }
 
-        setAnimatingIds((prev) => prev.filter((id) => id !== task.id));
+        setAnimatingIds((prev) => prev.filter((id) => id !== item.id));
       }, 300);
     } catch (err) {
-      console.error(err);
-      setAnimatingIds((prev) => prev.filter((id) => id !== task.id));
+      console.log("delete error:", err);
+
+      setAnimatingIds((prev) => prev.filter((id) => id !== item.id));
     }
   };
 
   function handleDetails(goal: any) {
-  console.log("Raw goal clicked:", goal);
+    console.log("Raw goal clicked:", goal);
 
-  const formattedGoal = {
-    id: goal.id,
-    title: goal.title || goal.name,
-    description: goal.goal || goal.description || "",
-    days: goal.days ?? [], // IMPORTANT FIX
-  };
+    const formattedGoal = {
+      id: goal.id,
+      title: goal.title || goal.name,
+      description: goal.description || goal.goal || "",
+      days: goal.days ?? [],
+    };
 
-  console.log("Formatted goal sent to modal:", formattedGoal);
+    console.log("Formatted goal sent to modal:", formattedGoal);
 
-  setSelectedGoal(formattedGoal);
-  setOpenModal(true);
-}
+    setSelectedGoal(formattedGoal);
+    setOpenModal(true);
+  }
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-50 border rounded-xl overflow-hidden">
@@ -217,7 +225,9 @@ export default function RunningTasks({
               }`}
             >
               <div>
-                <div className="font-semibold text-sm">{task.name}</div>
+                <div className="font-semibold text-sm">
+                  {task.title || task.name}
+                </div>
                 <div className="text-xs text-slate-400">
                   {task.dueDate} {task.dueTime}
                 </div>
