@@ -25,17 +25,19 @@ export default function AIChat({
 
   const [activeGoal, setActiveGoal] = useState<any>(null);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
-
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-    const saveMessagesToDB = async () =>{
+    const saveMessagesToDB = async () => {
       await replaceChatHistory(messages, token);
       console.log("bot reply saved to DB");
     }
-    console.log("message is: ",messages);
-    if(token){
+    console.log("message is: ", messages);
+    if (token) {
       saveMessagesToDB();
     }
   }, [messages]);
@@ -99,7 +101,7 @@ export default function AIChat({
     const match = aiRes.match;
 
     let botReply = aiRes.reply || "I couldn't understand that request";
-    
+
     // =========================
     // CHAT ONLY
     // =========================
@@ -182,65 +184,113 @@ export default function AIChat({
     }
 
     setMessages([...updatedMessages, { role: "bot", text: botReply }]);
-    
+
   };
 
-  const handleVoice = () => {
-    setIsListening(true);
+  const handleVoice = async () => {
+  if (isRecording) {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+    return;
+  }
 
-    setTimeout(() => {
-      setInputValue("Hello AI, this is voice input");
-      setIsListening(false);
-    }, 2000);
-  };
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const mediaRecorder = new MediaRecorder(stream);
+    mediaRecorderRef.current = mediaRecorder;
+    audioChunksRef.current = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunksRef.current.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+
+      const formData = new FormData();
+      formData.append("file", audioBlob, "voice.webm");
+
+      const res = await fetch("/api/whisper", {
+        method: "POST",
+        body: formData,
+      });
+
+      console.log("whisper raw response:", res);
+
+      const data = await res.json();
+      console.log("whisper json:", data);
+
+      const transcript = data?.text;
+
+      if (transcript) {
+        setInputValue(transcript);
+      }
+    };
+
+    mediaRecorder.start();
+    setIsRecording(true);
+  } catch (err) {
+    console.log("mic error:", err);
+    setIsRecording(false);
+  }
+};
 
   return (
-    <div className="w-full h-[450px] flex flex-col bg-slate-50 border rounded-xl overflow-hidden">
-      <div className="bg-indigo-600 p-4 text-white font-bold">
-        AI Assistant
-      </div>
+    <div className= "w-full h-[450px] flex flex-col bg-slate-50 border rounded-xl overflow-hidden" >
+    <div className="bg-indigo-600 p-4 text-white font-bold" >
+      AI Assistant
+        </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${
-              msg.role === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
+        < div className = "flex-1 overflow-y-auto p-4" >
+        {
+          messages.map((msg, i) => (
             <div
-              className={`p-3 rounded-lg text-sm max-w-[80%] ${
-                msg.role === "user"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-slate-200"
+            key= { i }
+            className = {`flex ${msg.role === "user" ? "justify-end" : "justify-start"
               }`}
+          >
+          <div
+              className={
+    `p-3 rounded-lg text-sm max-w-[80%] ${msg.role === "user"
+      ? "bg-indigo-600 text-white"
+      : "bg-slate-200"
+      }`
+  }
             >
-              {msg.text}
-            </div>
-          </div>
-        ))}
-        <div ref={scrollRef} />
-      </div>
+    { msg.text }
+    </div>
+    </div>
+        ))
+}
+<div ref={ scrollRef } />
+  </div>
 
-      <div className="p-3 flex gap-2 border-t">
-        <button onClick={handleVoice} className="px-3 bg-slate-200 rounded">
-          🎤
-        </button>
+  < div className = "p-3 flex gap-2 border-t" >
+    <button
+  onClick={ handleVoice }
+className = {`px-3 rounded transition-all duration-200 ${isRecording
+  ? "bg-red-500 text-white animate-pulse scale-110"
+  : "bg-slate-200"
+  }`}
+>
+  🎤
+</button>
 
-        <input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          className="flex-1 border p-2 rounded"
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+  < input
+value = { inputValue }
+onChange = {(e) => setInputValue(e.target.value)}
+className = "flex-1 border p-2 rounded"
+onKeyDown = {(e) => e.key === "Enter" && handleSend()}
         />
 
-        <button
-          onClick={handleSend}
-          className="bg-indigo-600 text-white px-4 rounded"
-        >
-          Send
-        </button>
-      </div>
-    </div>
+  < button
+onClick = { handleSend }
+className = "bg-indigo-600 text-white px-4 rounded"
+  >
+  Send
+  </button>
+  </div>
+  </div>
   );
 }
