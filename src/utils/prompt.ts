@@ -259,9 +259,11 @@ OUTPUT FORMAT:
     "title": "",
     "goal": "",
     "duration": "",
+    "completionPercentage": 0,
     "days": [
       {
         "day": 1,
+        "completionPercentage": 0,
         "tasks": [
           {
             "title": "",
