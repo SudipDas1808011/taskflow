@@ -43,6 +43,16 @@ export async function POST(req: Request) {
     const operation = intent?.operation;
 
     // =========================
+    // SAFETY GUARD
+    // =========================
+    if (!intent?.type || !operation) {
+      return NextResponse.json({
+        type: "error",
+        reply: "Invalid intent"
+      });
+    }
+
+    // =========================
     // STEP 2: ADD FLOW
     // =========================
     if (intent.type === "task" && operation === "add") {
@@ -55,7 +65,19 @@ export async function POST(req: Request) {
     }
 
     // =========================
-    // STEP 3: DELETE / RETRY / COMPLETE FLOW (MATCHING)
+    // STEP 3: GOAL HANDLING (PLACEHOLDER FOR NOW)
+    // =========================
+    if (intent.type === "goal") {
+      return NextResponse.json({
+        type: "goal",
+        intent,
+        match: null,
+        reply: intent.reply || "Goal detected"
+      });
+    }
+
+    // =========================
+    // STEP 4: DELETE / RETRY / COMPLETE FLOW (MATCHING)
     // =========================
     if (
       intent.type === "task" &&
@@ -81,9 +103,19 @@ export async function POST(req: Request) {
       const db = mongoClient.db("taskdb");
 
       const user = await db.collection("users").findOne({ email });
-      const tasks = user?.tasks || [];
+
+      const tasks =
+        user?.tasks?.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          isCompleted: t.isCompleted,
+          description: t.description,
+          dueDate: t.dueDate,
+          dueTime: t.dueTime
+        })) || [];
 
       console.log("Sending tasks for matching:", tasks);
+      console.log("Operation:", operation, "Type:", intent.type);
 
       if (tasks.length === 0) {
         return NextResponse.json({
@@ -124,12 +156,15 @@ export async function POST(req: Request) {
         type: "task",
         intent,
         match,
-        reply: match?.message || intent.reply || "OK"
+        reply:
+          match?.message ||
+          intent.reply ||
+          "I processed your request"
       });
     }
 
     // =========================
-    // STEP 4: CHAT / FALLBACK
+    // STEP 5: CHAT / FALLBACK
     // =========================
     return NextResponse.json({
       type: intent.type || "chat",

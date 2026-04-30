@@ -1,8 +1,28 @@
+
 export type TaskItem = {
-  _id?: string,
+  id?: string;
   name: string;
+  description: string;
   dueDate: string;
   dueTime: string;
-  description: string;
   isCompleted: boolean;
+  isGoal?: boolean;
+  createdAt?: Date;
+};
+
+export type User = {
+  email: string;
+  password: string;
+  token?: string;
+  task: TaskItem[];
+  goal: any[];
+};
+
+export type Goal = {
+  id: string;
+  title: string;
+  description: string;
+  duration: string;
+  days: any[];
+  createdAt: Date;
 };

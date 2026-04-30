@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import CreateTask from "@/components/CreateTask";
 import RunningTasks from "@/components/RunningTasks";
@@ -7,21 +7,38 @@ import AIChat from "@/components/AIChat";
 import { Stats, History } from "@/components/Stats";
 import { TaskItem } from "@/types/types";
 import { deleteTask } from "@/services/taskService";
+import Login from "@/components/Login";
 
 export default function Home() {
   const [refresh, setRefresh] = useState(false);
   const [retryTask, setRetryTask] = useState<TaskItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [email, setEmail] = useState<string> ("");
+
 
   const handleRetry = (task: TaskItem) => {
     setRetryTask(task);
     setIsCreateOpen(true);
   };
 
+  useEffect(() => {
+    const savedToken = localStorage.getItem("token");
+    const email_local = localStorage.getItem("email") || "";
+    setEmail(email_local);
+    console.log("Loaded token:", savedToken);
+    if (savedToken) {
+      setToken(savedToken);
+    }
+  }, []);
+
+  if (!token) {
+    return <Login onLoginSuccess={setToken} />;
+  }
   const handleCreated = async () => {
-    if (retryTask?._id) {
+    if (retryTask?.id) {
       try {
-        await deleteTask(retryTask._id);
+        await deleteTask(email,retryTask.id,token);
         console.log("Old task deleted after retry");
       } catch (err) {
         console.error("Failed to delete old task:", err);
@@ -52,16 +69,16 @@ export default function Home() {
           </div>
 
           <div className="md:col-span-2 lg:col-span-4 min-h-[400px] lg:h-[450px]">
-            <AIChat />
+            <AIChat setRefresh={setRefresh} />
           </div>
         </div>
 
         {/* Bottom Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-4">
             <Stats />
           </div>
-          <div className="lg:col-span-9">
+          <div className="lg:col-span-8">
             <History refresh={refresh} onRetry={handleRetry} />
           </div>
         </div>

@@ -1,31 +1,33 @@
-export const postTask = async (taskData: any) => {
+export const postTask = async (taskData: any, token: string) => {
   try {
-    const response = await fetch("/api/tasks", {
+    const response = await fetch("/api/tasks/create", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(taskData),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        token,
+        task: taskData,
+      }),
     });
 
-    return response;
-    
-  } catch (error) {
-    console.error("Fetch error in service:", error);
-    throw error; 
-  }
-};
+    console.log("Post task status:", response.status);
 
-export const getTasks = async () => {
-  try {
-    const response = await fetch("/api/tasks", {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tasks: ${response.statusText}`);
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      console.log("Response is not JSON");
+      throw new Error("Invalid server response");
     }
 
-    const data = await response.json();
+    console.log("Post task response:", data);
+
+    if (!response.ok) {
+      throw new Error(data?.message || "Task creation failed");
+    }
+
     return data;
   } catch (error) {
     console.error("Fetch error in service:", error);
@@ -33,40 +35,85 @@ export const getTasks = async () => {
   }
 };
 
-export const updateTask = async (id: string, data: any) => {
-  const res = await fetch(`/api/tasks/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
+export const getTasks = async (token: string) => {
+  try {
+    const response = await fetch("/api/tasks/get", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ token }),
+    });
 
- if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.message || "Update failed");
+    console.log("Get tasks status:", response.status);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tasks: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    console.log("Get tasks response:", data);
+
+    return data;
+  } catch (error) {
+    console.error("Fetch error in service:", error);
+    throw error;
   }
-
-  return res.json();
 };
 
-export const deleteTask = async (id: string) => {
-    try {
-        const res = await fetch(`/api/tasks/${id}`, {
-            method: "DELETE",
-        });
+export const updateTask = async (
+  email: string,
+  taskId: string,
+  isCompleted: boolean,
+  token: string
+) => {
+  const res = await fetch(`/api/tasks`, {
+    method: "PUT",
+    headers: {
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${token}`,
+},
+    body: JSON.stringify({
+      email,
+      taskId,
+      isCompleted,
+    }),
+  });
 
-        console.log("Delete API response:", res);
+  const result = await res.json();
 
-        const data = await res.json();
-        console.log("Delete response data:", data);
+  console.log("Update response:", result);
 
-        if (!res.ok) {
-            throw new Error(data.message);
-        }
+  if (!res.ok) {
+    throw new Error(result.message || "Update failed");
+  }
 
-        console.log("Task deleted successfully");
-    } catch (error) {
-        console.error("Error deleting task:", error);
-    }
+  return result;
+};
+
+export const deleteTask = async (email: string, taskId: string, token: string) => {
+  const res = await fetch(`/api/tasks`, {
+    method: "DELETE",
+    headers: {
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${token}`,
+},
+    body: JSON.stringify({
+      email,
+      taskId,
+    }),
+  });
+
+  console.log("Delete status:", res.status);
+
+  const result = await res.json();
+  console.log("Delete response:", result);
+
+  if (!res.ok) {
+    throw new Error(result.message || "Delete failed");
+  }
+
+  return result;
 };

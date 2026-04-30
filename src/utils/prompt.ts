@@ -53,19 +53,30 @@ export const contentPrompt = `
 CURRENT DATE: ${dueDate}
 CURRENT TIME: ${dueTime}
 
-You are a task assistant.
+You are an intent extraction engine.
 
-You ONLY extract user intent.
+Your job is ONLY to understand user intent and classify it.
 
-You must NOT generate taskId.
+You do NOT perform any actions.
 
 ----------------------
 
-OPERATIONS:
-1. add → create new task
-2. delete → remove task
-3. retry → reschedule task
-4. complete → mark task as done
+INTENT TYPES:
+1. task → single actionable task (add, delete, retry, complete)
+2. goal → long-term planning (e.g. finish book in 7 days)
+3. chat → normal conversation
+
+----------------------
+
+TASK OPERATIONS:
+- add → create new task
+- delete → remove task
+- retry → reschedule task
+- complete → mark task as done
+
+GOAL OPERATIONS:
+- plan → user wants to achieve something over time
+- clarify → missing info needed for planning
 
 ----------------------
 
@@ -73,24 +84,26 @@ RULES:
 - Always return valid JSON
 - No explanation
 - No markdown
-- If unclear → return chat type
+- Never generate taskId
+- Never execute logic
+- Only classify intent
 
 ----------------------
 
 DATE RULES:
 - If time is provided but date is missing → use CURRENT DATE
-- If user says only time (e.g. "4 pm") → use CURRENT DATE
-- dueDate should be inferred when possible
-- ONLY set today's date when user explicitly implies same-day task
+- If only time is given → assume today
+- Infer dueDate when possible
 
 ----------------------
 
-TASK FORMAT:
+OUTPUT FORMAT:
 
+TASK:
 {
   "type": "task",
   "operation": "add | delete | retry | complete",
-  "reply": "Write a short natural response like a human assistant. Example: 'Got it, I’ll add your dinner task for 10 PM' or 'Okay, I’ve marked your dinner as completed.'",
+  "reply": "natural human-like response",
   "data": {
     "name": "",
     "dueDate": "",
@@ -100,33 +113,51 @@ TASK FORMAT:
   }
 }
 
+GOAL:
+{
+  "type": "goal",
+  "operation": "plan | clarify",
+  "reply": "natural human-like response",
+  "data": {
+    "goal": "",
+    "context": ""
+  }
+}
+
+CHAT:
+{
+  "type": "chat",
+  "reply": "natural response",
+  "data": {}
+}
+
 ----------------------
 
-OPERATION RULES:
+RULES FOR TASK:
+- add → extract full details
+- delete/retry/complete → only extract query
 
-ADD:
-- Extract full task details
-
-DELETE / RETRY / COMPLETE:
-- Only extract SEARCH QUERY
-- NEVER return taskId
-- NEVER try to match tasks
+RULES FOR GOAL:
+- If user says long-term plan (7 days, 1 month, finish book, learn X)
+  → classify as goal
+- If missing info → clarify
+- DO NOT break into tasks here
 
 ----------------------
 
 EXAMPLES:
 
-User: mark exercise as done
+User: I want to finish this book in 7 days
+→ type: goal
+→ operation: plan
+
+User: I have completed my dinner
+→ type: task
 → operation: complete
-→ query: exercise
 
 User: remove coffee meeting
+→ type: task
 → operation: delete
-→ query: coffee meeting
-
-User: reschedule meeting
-→ operation: retry
-→ query: meeting
 `;
 export const matchPrompt = `
 You are a STRICT task ID selector.
@@ -207,4 +238,40 @@ ALREADY COMPLETED:
   "taskId": ""
 }
 `;
+
+export const goalContentPrompt = `
+You are a goal planning engine.
+
+You must convert a user goal into a structured step-by-step daily plan.
+
+RULES:
+- Return ONLY valid JSON
+- No markdown
+- No explanation
+- Be practical and actionable
+- Break goal into daily tasks
+- Keep tasks small and achievable
+
+OUTPUT FORMAT:
+
+{
+  "plan": {
+    "title": "",
+    "goal": "",
+    "duration": "",
+    "days": [
+      {
+        "day": 1,
+        "tasks": [
+          {
+            "title": "",
+            "description": "",
+            "done": false
+          }
+        ]
+      }
+    ]
+  }
+}
+`
 

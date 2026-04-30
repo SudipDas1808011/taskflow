@@ -1,8 +1,9 @@
-export const sendToAI = async (messages: any[]) => {
+export const sendToAI = async (messages: any[], email: string) => {
   const response = await fetch("/api/ai", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      email: email,
     },
     body: JSON.stringify({ messages }),
   });

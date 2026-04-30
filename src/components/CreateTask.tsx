@@ -21,7 +21,6 @@ export default function CreateTask({
   dueDate: initialData?.dueDate || "",
   dueTime: initialData?.dueTime || "",
   description: initialData?.description || "",
-  isGoal: initialData?.isGoal || false,
   isCompleted: false,
 }));
 
@@ -37,7 +36,6 @@ export default function CreateTask({
       dueDate: initialData.dueDate,
       dueTime: initialData.dueTime,
       description: initialData.description,
-      isGoal: initialData.isGoal,
       isCompleted: false,
     });
   }
@@ -52,27 +50,50 @@ export default function CreateTask({
     });
   };
 
-  const handleSubmit = async () => {
-    if (!task.name || !task.dueDate || !task.dueTime) {
-      alert("Please fill all required fields");
+const handleSubmit = async () => {
+  if (!task.name || !task.dueDate || !task.dueTime) {
+    alert("Please fill all required fields");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("User not authenticated");
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const response = await postTask(task);
 
-      if (response.ok) {
-        setTask({ name: "", dueDate: "", dueTime: "", description: "", isGoal:false, isCompleted: false });
-        setLoading(false);
-        onCreated();
-      } else {
-        alert("Something went wrong on the server.");
-      }
-    } catch (error) {
-      alert("Failed to connect to the server.");
+    console.log("Submitting task:", task);
+
+    const data = await postTask(task, token); 
+    console.log("Create task response:", data);
+
+    if (!data) {
+      alert("Something went wrong on server");
+      return;
     }
-  };
 
+    setTask({
+      name: "",
+      dueDate: "",
+      dueTime: "",
+      description: "",
+      isCompleted: false,
+    });
+
+    onCreated();
+    console.log("Task created successfully");
+  } catch (error) {
+    console.error("Create task error:", error);
+    alert("Failed to connect to server");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="w-full h-full flex flex-col bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
 
