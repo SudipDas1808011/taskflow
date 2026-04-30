@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { sendToAI } from "@/services/aiService";
 import { deleteTask, postTask, updateTask } from "@/services/taskService";
-import { getChatHistory } from "@/services/chatService";
+import { getChatHistory, replaceChatHistory } from "@/services/chatService";
 
 type Message = {
   role: "user" | "bot";
@@ -23,10 +23,21 @@ export default function AIChat({
   const [token, setToken] = useState("");
   const [email, setEmail] = useState("");
 
+  const [activeGoal, setActiveGoal] = useState<any>(null);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    // scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    const saveMessagesToDB = async () =>{
+      await replaceChatHistory(messages, token);
+      console.log("bot reply saved to DB");
+    }
+    console.log("message is: ",messages);
+    if(token){
+      saveMessagesToDB();
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -76,6 +87,8 @@ export default function AIChat({
 
     let updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
+    await replaceChatHistory(updatedMessages, token);
+    console.log("use message  saved to DB");
     setInputValue("");
 
     const aiRes = await sendAI(updatedMessages);
@@ -86,18 +99,45 @@ export default function AIChat({
     const match = aiRes.match;
 
     let botReply = aiRes.reply || "I couldn't understand that request";
-
+    
     // =========================
     // CHAT ONLY
     // =========================
     if (aiRes.type === "chat") {
-      updatedMessages = [
-        ...updatedMessages,
-        { role: "bot", text: botReply },
-      ];
-
-      setMessages(updatedMessages);
+      setMessages([...updatedMessages, { role: "bot", text: botReply }]);
       return;
+    }
+
+    // =========================
+    // GOAL FLOW (ADDED)
+    // =========================
+    if (aiRes.type === "goal") {
+      const email = localStorage.getItem("email");
+
+      const goalRes = await fetch("/api/ai/goal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          goal: intent.data.goal,
+          context: intent.data.context,
+          email,
+        }),
+      });
+
+      const goalData = await goalRes.json();
+
+      console.log("Goal Response:", goalData);
+
+      if (!goalData?.plan) {
+        botReply = "Failed to generate goal plan";
+      } else {
+        setActiveGoal(goalData.plan);
+        setGoalModalOpen(true);
+        setRefresh((prev) => !prev);
+        return;
+      }
     }
 
     // =========================
@@ -121,14 +161,6 @@ export default function AIChat({
         setRefresh((prev) => !prev);
       }
 
-      if (match?.status === "not_found") {
-        botReply = "I couldn't find the task";
-      }
-
-      if (match?.status === "already_completed") {
-        botReply = "The task is already completed";
-      }
-
       if (match?.status === "matched") {
         const taskId = match.taskId;
 
@@ -149,15 +181,8 @@ export default function AIChat({
       }
     }
 
-    // =========================
-    // FINAL BOT MESSAGE (SINGLE SOURCE OF TRUTH)
-    // =========================
-    updatedMessages = [
-      ...updatedMessages,
-      { role: "bot", text: botReply },
-    ];
-
-    setMessages(updatedMessages);
+    setMessages([...updatedMessages, { role: "bot", text: botReply }]);
+    
   };
 
   const handleVoice = () => {
