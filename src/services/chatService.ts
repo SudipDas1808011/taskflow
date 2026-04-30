@@ -1,6 +1,6 @@
 export const getChatHistory = async (token: string) => {
   try {
-    const response = await fetch("/api/chat", {
+    const response = await fetch("/api/ai/chatHistory", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -16,10 +16,10 @@ export const getChatHistory = async (token: string) => {
       throw new Error(data.message || "Fetch failed");
     }
 
-    return data.chatHistory;
+    return data.chatHistory || [];
   } catch (error) {
     console.error("getChatHistory error:", error);
-    throw error;
+    return [];
   }
 };
 
@@ -28,17 +28,15 @@ export const replaceChatHistory = async (
   token: string
 ) => {
   try {
-    console.log("we have the message history:>> ",messages);
-    return;
-    const response = await fetch("/api/chat", {
+    console.log("Chat update payload:", messages);
+
+    const response = await fetch("/api/ai/chatHistory", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        messages,
-      }),
+      body: JSON.stringify({ messages }),
     });
 
     console.log("Replace chat status:", response.status);
@@ -53,6 +51,6 @@ export const replaceChatHistory = async (
     return data;
   } catch (error) {
     console.error("replaceChatHistory error:", error);
-    throw error;
+    return null;
   }
 };

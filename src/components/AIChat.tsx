@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { sendToAI } from "@/services/aiService";
 import { deleteTask, postTask, updateTask } from "@/services/taskService";
 import { getChatHistory } from "@/services/chatService";
-import { generateGoalPlan } from "@/services/goalService";
 
 type Message = {
   role: "user" | "bot";
@@ -26,15 +25,8 @@ export default function AIChat({
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [activeGoal, setActiveGoal] = useState<any>(null);
-  const [goalModalOpen, setGoalModalOpen] = useState(false);
-
-  const scrollToBottom = () => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -44,11 +36,14 @@ export default function AIChat({
 
   useEffect(() => {
     const fetchChatHistory = async () => {
-      if (token) {
-        const history = await getChatHistory(token);
-        setMessages(history);
-      }
+      if (!token) return;
+
+      const history = await getChatHistory(token);
+      console.log("Chat history:", history);
+
+      setMessages(history || []);
     };
+
     fetchChatHistory();
   }, [token]);
 
@@ -60,104 +55,81 @@ export default function AIChat({
   });
 
   const sendAI = async (updatedMessages: Message[]) => {
-    try {
-      const email = localStorage.getItem("email");
-      const token = localStorage.getItem("token");
+    const email = localStorage.getItem("email");
+    const token = localStorage.getItem("token");
 
-      if (!email || !token) return;
+    if (!email || !token) return null;
 
-      const resRaw = await sendToAI(updatedMessages, email);
-      const res = normalizeAIResponse(resRaw);
+    const resRaw = await sendToAI(updatedMessages, email);
+    console.log("AI RAW:", resRaw);
 
-      const intent = res.intent || {};
-      const match = res.match;
-      const operation = intent.operation;
+    return normalizeAIResponse(resRaw);
+  };
 
-      const botMessage = (text: string) =>
-        setMessages((prev) => [...prev, { role: "bot", text }]);
+  const handleSend = async () => {
+    if (!inputValue.trim()) return;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "bot",
-          text:
-            match?.message ||
-            res.reply ||
-            "I couldn't process that request.",
-        },
-      ]);
+    const userMessage: Message = {
+      role: "user",
+      text: inputValue,
+    };
 
-      if (!operation) {
-        botMessage("I couldn't understand that action.");
-        return;
-      }
+    let updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInputValue("");
 
-      const data = intent.data || {};
+    const aiRes = await sendAI(updatedMessages);
+    if (!aiRes) return;
 
-      // =========================
-      // ADD TASK
-      // =========================
-      if (res.type === "task" && operation === "add") {
-        const taskPayload = {
-          name: data.name,
-          dueDate: data.dueDate,
-          dueTime: data.dueTime,
-          description: data.description || "",
-          isGoal: false,
-          isCompleted: false,
-        };
+    const intent = aiRes.intent || {};
+    const operation = intent.operation;
+    const match = aiRes.match;
 
-        await postTask(taskPayload, token);
-        setRefresh((prev) => !prev);
-        return;
-      }
+    let botReply = aiRes.reply || "I couldn't understand that request";
 
-      // =========================
-      // GOAL FLOW (FIXED)
-      // =========================
-      if (res.type === "goal") {
-        const goalRes = await fetch("/api/ai/goal", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+    // =========================
+    // CHAT ONLY
+    // =========================
+    if (aiRes.type === "chat") {
+      updatedMessages = [
+        ...updatedMessages,
+        { role: "bot", text: botReply },
+      ];
+
+      setMessages(updatedMessages);
+      return;
+    }
+
+    // =========================
+    // TASK FLOW
+    // =========================
+    if (aiRes.type === "task") {
+      if (operation === "add") {
+        await postTask(
+          {
+            name: intent.data?.name,
+            dueDate: intent.data?.dueDate,
+            dueTime: intent.data?.dueTime,
+            description: intent.data?.description || "",
+            isGoal: false,
+            isCompleted: false,
           },
-          body: JSON.stringify({
-            goal: intent.data.goal,
-            context: intent.data.context,
-            email,
-          }),
-        });
+          token
+        );
 
-        const goalData = await goalRes.json();
-
-        if (!goalData?.plan) {
-          botMessage("Failed to generate goal plan");
-          return;
-        }
-
-        setActiveGoal(goalData.plan);
-        setGoalModalOpen(true);
+        botReply = "Task added successfully";
         setRefresh((prev) => !prev);
-
-        return;
       }
 
-      // =========================
-      // TASK MATCHING
-      // =========================
-      if (!match || !match.status) return;
-
-      if (match.status === "already_completed") {
-        botMessage("The task is already completed");
-        return;
+      if (match?.status === "not_found") {
+        botReply = "I couldn't find the task";
       }
 
-      if (match.status === "not_found") {
-        botMessage("I couldn't find the task");
-        return;
+      if (match?.status === "already_completed") {
+        botReply = "The task is already completed";
       }
 
-      if (match.status === "matched" && match.taskId) {
+      if (match?.status === "matched") {
         const taskId = match.taskId;
 
         if (operation === "delete") {
@@ -172,34 +144,27 @@ export default function AIChat({
           await updateTask(email, taskId, true, token);
         }
 
+        botReply = "Done";
         setRefresh((prev) => !prev);
       }
-    } catch (error) {
-      console.error("AI error:", error);
     }
-  };
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+    // =========================
+    // FINAL BOT MESSAGE (SINGLE SOURCE OF TRUTH)
+    // =========================
+    updatedMessages = [
+      ...updatedMessages,
+      { role: "bot", text: botReply },
+    ];
 
-    const userMessage: Message = {
-      role: "user",
-      text: inputValue,
-    };
-
-    const updated = [...messages, userMessage];
-    setMessages(updated);
-
-    sendAI(updated);
-    setInputValue("");
+    setMessages(updatedMessages);
   };
 
   const handleVoice = () => {
     setIsListening(true);
 
     setTimeout(() => {
-      const fakeSpeech = "Hello AI, this is voice input";
-      setInputValue(fakeSpeech);
+      setInputValue("Hello AI, this is voice input");
       setIsListening(false);
     }, 2000);
   };
