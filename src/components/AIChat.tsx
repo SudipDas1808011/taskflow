@@ -15,7 +15,6 @@ export default function AIChat({
 }: {
   setRefresh: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const [isListening, setIsListening] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: "bot", text: "Hello! How can I help you today?" },
   ]);
@@ -23,25 +22,32 @@ export default function AIChat({
   const [token, setToken] = useState("");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const [activeGoal, setActiveGoal] = useState<any>(null);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  };
 
   useEffect(() => {
-    // scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
     const saveMessagesToDB = async () => {
       await replaceChatHistory(messages, token);
-      console.log("bot reply saved to DB");
-    }
-    console.log("message is: ", messages);
+    };
     if (token) {
       saveMessagesToDB();
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   useEffect(() => {
     setToken(localStorage.getItem("token") || "");
@@ -51,13 +57,9 @@ export default function AIChat({
   useEffect(() => {
     const fetchChatHistory = async () => {
       if (!token) return;
-
       const history = await getChatHistory(token);
-      console.log("Chat history:", history);
-
       setMessages(history || []);
     };
-
     fetchChatHistory();
   }, [token]);
 
@@ -70,28 +72,21 @@ export default function AIChat({
 
   const sendAI = async (updatedMessages: Message[]) => {
     const email = localStorage.getItem("email");
-    const token = localStorage.getItem("token");
-
-    if (!email || !token) return null;
-
+    if (!email) return null;
     const resRaw = await sendToAI(updatedMessages, email);
-    console.log("AI RAW:", resRaw);
-
     return normalizeAIResponse(resRaw);
   };
 
   const handleSend = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
       role: "user",
       text: inputValue,
     };
 
-    let updatedMessages = [...messages, userMessage];
+    const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
-    await replaceChatHistory(updatedMessages, token);
-    console.log("use message  saved to DB");
     setInputValue("");
     setIsLoading(true);
 
@@ -105,46 +100,29 @@ export default function AIChat({
       const intent = aiRes.intent || {};
       const operation = intent.operation;
       const match = aiRes.match;
-
       let botReply = aiRes.reply || "I couldn't understand that request";
 
       if (aiRes.type === "chat") {
         setMessages([...updatedMessages, { role: "bot", text: botReply }]);
-        setIsLoading(false);
-        return;
-      }
-
-      if (aiRes.type === "goal") {
-        const email = localStorage.getItem("email");
-
+      } else if (aiRes.type === "goal") {
         const goalRes = await fetch("/api/ai/goal", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             goal: intent.data.goal,
             context: intent.data.context,
-            email,
+            email: localStorage.getItem("email"),
           }),
         });
-
         const goalData = await goalRes.json();
-
-        console.log("Goal Response:", goalData);
-
-        if (!goalData?.plan) {
-          botReply = "Failed to generate goal plan";
-        } else {
+        if (goalData?.plan) {
           setActiveGoal(goalData.plan);
           setGoalModalOpen(true);
           setRefresh((prev) => !prev);
-          setIsLoading(false);
-          return;
+        } else {
+          setMessages([...updatedMessages, { role: "bot", text: "Failed to generate goal plan" }]);
         }
-      }
-
-      if (aiRes.type === "task") {
+      } else if (aiRes.type === "task") {
         if (operation === "add") {
           await postTask(
             {
@@ -157,34 +135,23 @@ export default function AIChat({
             },
             token
           );
-
           botReply = "Task added successfully";
           setRefresh((prev) => !prev);
         }
 
         if (match?.status === "matched") {
           const taskId = match.taskId;
-
-          if (operation === "delete") {
-            await deleteTask(email, taskId, token);
-          }
-
-          if (operation === "retry") {
-            await updateTask(email, taskId, false, token);
-          }
-
-          if (operation === "complete") {
-            await updateTask(email, taskId, true, token);
-          }
-
+          const userEmail = localStorage.getItem("email") || "";
+          if (operation === "delete") await deleteTask(userEmail, taskId, token);
+          if (operation === "retry") await updateTask(userEmail, taskId, false, token);
+          if (operation === "complete") await updateTask(userEmail, taskId, true, token);
           botReply = "Done";
           setRefresh((prev) => !prev);
         }
+        setMessages([...updatedMessages, { role: "bot", text: botReply }]);
       }
-
-      setMessages([...updatedMessages, { role: "bot", text: botReply }]);
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("AI Error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -196,41 +163,20 @@ export default function AIChat({
       setIsRecording(false);
       return;
     }
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-
+      mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-
         const formData = new FormData();
         formData.append("file", audioBlob, "voice.webm");
-
-        const res = await fetch("/api/whisper", {
-          method: "POST",
-          body: formData,
-        });
-
-        console.log("whisper raw response:", res);
-
+        const res = await fetch("/api/whisper", { method: "POST", body: formData });
         const data = await res.json();
-        console.log("whisper json:", data);
-
-        const transcript = data?.text;
-
-        if (transcript) {
-          setInputValue(transcript);
-        }
+        if (data?.text) setInputValue(data.text);
       };
-
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
@@ -241,64 +187,48 @@ export default function AIChat({
 
   return (
     <div className="w-full h-[450px] flex flex-col bg-slate-50 border rounded-xl overflow-hidden">
-      <div className="bg-indigo-600 p-4 text-white font-bold">
-        AI Assistant
-      </div>
+      <div className="bg-indigo-600 p-4 text-white font-bold">AI Assistant</div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex mb-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`p-3 rounded-lg text-sm max-w-[80%] ${msg.role === "user"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-slate-200"
-                }`}
-            >
+          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`p-3 rounded-lg text-sm max-w-[80%] ${msg.role === "user" ? "bg-indigo-600 text-white" : "bg-slate-200"}`}>
               {msg.text}
             </div>
           </div>
         ))}
         {isLoading && (
-          <div className="flex justify-start mb-4">
-            <div className="bg-slate-200 p-3 rounded-lg flex gap-1">
+          <div className="flex justify-start">
+            <div className="bg-slate-200 p-3 rounded-lg flex gap-1 items-center">
               <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
               <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
               <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce"></div>
             </div>
           </div>
         )}
-        <div ref={scrollRef} />
       </div>
 
       <div className="p-3 flex gap-2 border-t bg-white">
         <button
           onClick={handleVoice}
-          className={`px-3 rounded transition-all duration-200 ${isRecording
-              ? "bg-red-500 text-white animate-pulse scale-110"
-              : "bg-slate-200"
-            }`}
+          className={`px-3 rounded transition-all ${isRecording ? "bg-red-500 text-white animate-pulse" : "bg-slate-200"}`}
         >
           🎤
         </button>
-
         <input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           className="flex-1 border p-2 rounded outline-none focus:border-indigo-600"
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Type your message..."
+          placeholder="Type a message..."
           disabled={isLoading}
         />
-
         <button
           onClick={handleSend}
-          disabled={isLoading}
-          className={`${isLoading ? "bg-indigo-400" : "bg-indigo-600"} text-white px-4 rounded transition-colors`}
+          disabled={isLoading || !inputValue.trim()}
+          className={`${isLoading ? "bg-indigo-300" : "bg-indigo-600"} text-white px-4 rounded transition-colors`}
         >
-          Send
+          {isLoading ? "..." : "Send"}
         </button>
       </div>
     </div>
