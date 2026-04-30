@@ -15,21 +15,12 @@ export async function POST(req: Request) {
 
     console.log("User input:", lastMessage);
 
-    // =========================
-    // STEP 1: INTENT DETECTION
-    // =========================
     const intentRes = await client.chat.completions.create({
       model: "gpt-4o-mini",
       response_format: { type: "json_object" },
       messages: [
-        {
-          role: "system",
-          content: contentPrompt,
-        },
-        {
-          role: "user",
-          content: lastMessage,
-        },
+        { role: "system", content: contentPrompt },
+        { role: "user", content: lastMessage },
       ],
       temperature: 0.3,
     });
@@ -43,41 +34,43 @@ export async function POST(req: Request) {
     const operation = intent?.operation;
 
     // =========================
-    // SAFETY GUARD
+    // 🔥 FIXED SAFETY GUARD
     // =========================
     if (!intent?.type || !operation) {
       return NextResponse.json({
-        type: "error",
-        reply: "Invalid intent"
+        type: "chat",
+        intent: {},
+        match: null,
+        reply: intent?.reply || "I couldn't understand that. Can you rephrase?",
       });
     }
 
     // =========================
-    // STEP 2: ADD FLOW
+    // TASK ADD
     // =========================
     if (intent.type === "task" && operation === "add") {
       return NextResponse.json({
         type: "task",
         intent,
         match: null,
-        reply: intent.reply || "Task created"
+        reply: intent.reply || "Task created",
       });
     }
 
     // =========================
-    // STEP 3: GOAL HANDLING (PLACEHOLDER FOR NOW)
+    // GOAL
     // =========================
     if (intent.type === "goal") {
       return NextResponse.json({
         type: "goal",
         intent,
         match: null,
-        reply: intent.reply || "Goal detected"
+        reply: intent.reply || "Goal detected",
       });
     }
 
     // =========================
-    // STEP 4: DELETE / RETRY / COMPLETE FLOW (MATCHING)
+    // TASK MATCH FLOW
     // =========================
     if (
       intent.type === "task" &&
@@ -88,15 +81,12 @@ export async function POST(req: Request) {
       const email = req.headers.get("email");
 
       if (!email) {
-        return NextResponse.json(
-          {
-            type: "error",
-            intent,
-            match: null,
-            reply: "Unauthorized"
-          },
-          { status: 401 }
-        );
+        return NextResponse.json({
+          type: "chat",
+          intent,
+          match: null,
+          reply: "Unauthorized",
+        });
       }
 
       const mongoClient = await clientPromise;
@@ -111,35 +101,20 @@ export async function POST(req: Request) {
           isCompleted: t.isCompleted,
           description: t.description,
           dueDate: t.dueDate,
-          dueTime: t.dueTime
+          dueTime: t.dueTime,
         })) || [];
-
-      console.log("Sending tasks for matching:", tasks);
-      console.log("Operation:", operation, "Type:", intent.type);
-
-      if (tasks.length === 0) {
-        return NextResponse.json({
-          type: "task",
-          intent,
-          match: null,
-          reply: "No tasks found to match"
-        });
-      }
 
       const matchRes = await client.chat.completions.create({
         model: "gpt-4o-mini",
         response_format: { type: "json_object" },
         messages: [
-          {
-            role: "system",
-            content: matchPrompt,
-          },
+          { role: "system", content: matchPrompt },
           {
             role: "user",
             content: JSON.stringify({
               query: intent.data.query,
               tasks,
-              operation
+              operation,
             }),
           },
         ],
@@ -147,43 +122,34 @@ export async function POST(req: Request) {
       });
 
       const matchRaw = matchRes.choices[0].message.content;
-      console.log("Match raw:", matchRaw);
-
       const match = JSON.parse(matchRaw || "{}");
-      console.log("Matched task:", match);
 
       return NextResponse.json({
         type: "task",
         intent,
         match,
-        reply:
-          match?.message ||
-          intent.reply ||
-          "I processed your request"
+        reply: match?.message || intent.reply || "Processed",
       });
     }
 
     // =========================
-    // STEP 5: CHAT / FALLBACK
+    // CHAT FALLBACK (FIXED)
     // =========================
     return NextResponse.json({
-      type: intent.type || "chat",
+      type: "chat",
       intent,
       match: null,
-      reply: intent.reply || "OK"
+      reply: intent.reply || "OK",
     });
 
   } catch (error) {
     console.error("AI API error:", error);
 
-    return NextResponse.json(
-      {
-        type: "error",
-        reply: "Something went wrong with AI",
-        intent: null,
-        match: null
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      type: "chat",
+      intent: {},
+      match: null,
+      reply: "Something went wrong, try again.",
+    });
   }
 }
