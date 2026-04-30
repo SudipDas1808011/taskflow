@@ -170,18 +170,18 @@ export default function RunningTasks({
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+    <div className="w-full h-full flex flex-col bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
 
-      {/* Header */}
-      <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 className="text-slate-900 font-bold text-lg tracking-tight">Running Tasks</h2>
-        <div className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+      {/* Header - Reverted to previous Gradient Style */}
+      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4 flex items-center justify-between shadow-md z-10">
+        <h2 className="text-white font-bold text-lg tracking-tight">Running Tasks</h2>
+        <div className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider border border-white/30">
           Live Feed
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-slate-50/50 p-1 mx-4 mt-4 rounded-xl border border-slate-200">
+      <div className="flex bg-white/50 p-1 mx-4 mt-4 rounded-xl border border-slate-200">
         <button
           onClick={() => setActiveTab("tasks")}
           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
@@ -228,6 +228,19 @@ export default function RunningTasks({
                 <div className="font-bold text-slate-800 text-sm truncate group-hover:text-indigo-600 transition-colors">
                   {task.name}
                 </div>
+                
+                {task.description && (
+                  <div className="relative group/desc">
+                    <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1 italic font-medium">
+                      {task.description}
+                    </p>
+                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover/desc:block z-50 w-64 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl pointer-events-none">
+                      {task.description}
+                      <div className="absolute left-4 top-full w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-slate-800"></div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-1.5 mt-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
                   <span className="text-[11px] font-semibold text-slate-400 uppercase">
@@ -267,8 +280,17 @@ export default function RunningTasks({
             >
               <div className="flex-1 min-w-0 pr-4">
                 <div className="font-bold text-slate-800 text-sm truncate">{goal.title}</div>
-                <div className="text-[11px] text-slate-400 mt-1 line-clamp-1 italic font-medium">
-                  {goal.description || "No description provided"}
+                
+                <div className="relative group/gdesc">
+                  <p className="text-[11px] text-slate-400 mt-1 line-clamp-1 italic font-medium">
+                    {goal.description || "No description provided"}
+                  </p>
+                  {goal.description && (
+                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover/gdesc:block z-50 w-64 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl pointer-events-none">
+                      {goal.description}
+                      <div className="absolute left-4 top-full w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-slate-800"></div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -295,11 +317,11 @@ export default function RunningTasks({
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+      <div className="px-5 py-3 bg-white border-t border-slate-100 flex justify-between items-center">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
           Status: {loading ? "Syncing" : "Up to date"}
         </span>
-        <div className="text-[10px] font-extrabold text-indigo-500 bg-white px-2 py-1 rounded-md border border-slate-200">
+        <div className="text-[10px] font-extrabold text-indigo-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
           {activeTab === "tasks" ? tasks.length : goals.length} Items
         </div>
       </div>
