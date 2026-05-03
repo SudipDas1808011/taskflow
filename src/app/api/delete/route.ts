@@ -1,52 +1,79 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
+import { MongoClient, Db, UpdateResult } from "mongodb";
 
-export async function DELETE(req: Request) {
+/**
+ * Interface for the expected DELETE request body.
+ */
+interface DeleteRequestBody {
+  email: string;
+  id: string | number;
+  type: "task" | "goal";
+}
+
+/**
+ * Handles the deletion of tasks or goals from a user's record in MongoDB.
+ * Ensures strict typing for request payload and database operations.
+ */
+export async function DELETE(req: Request): Promise<NextResponse> {
   try {
-    const { email, id, type } = await req.json();
+    const body: DeleteRequestBody = await req.json();
+    const { email, id, type } = body;
 
-    console.log("delete request:", { email, id, type });
+    if (!email || !id || !type) {
+      return NextResponse.json(
+        { success: false, message: "Missing required fields" },
+        { status: 400 }
+      );
+    }
 
-    const client = await clientPromise;
-    const db = client.db("taskdb");
+    const client: MongoClient = await clientPromise;
+    const db: Db = client.db("taskdb");
+
+    let result: UpdateResult;
 
     if (type === "task") {
-      const result = await db.collection("users").updateOne(
+      result = await db.collection("users").updateOne(
         { email },
         {
           $pull: {
             tasks: { id },
-          },
+          } as any,
         }
       );
-
-      console.log("task delete result:", result);
-    }
-
-    if (type === "goal") {
-      const result = await db.collection("users").updateOne(
+    } else if (type === "goal") {
+      result = await db.collection("users").updateOne(
         { email },
         {
           $pull: {
             goals: { id },
-          },
+          } as any,
         }
       );
-
-      console.log("goal delete result:", result);
+    } else {
+      return NextResponse.json(
+        { success: false, message: "Invalid type provided" },
+        { status: 400 }
+      );
     }
 
-    console.log("after await response - delete completed");
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { success: false, message: "User not found" },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      message: `${type} deleted`,
+      message: `${type.charAt(0).toUpperCase() + type.slice(1)} deleted successfully`,
     });
-  } catch (error) {
-    console.log("delete error:", error);
-
+  } catch (error: unknown) {
     return NextResponse.json(
-      { success: false, message: "Delete failed" },
+      { 
+        success: false, 
+        message: "Internal server error during deletion" 
+      },
       { status: 500 }
     );
   }

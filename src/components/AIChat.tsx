@@ -1,45 +1,68 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { sendToAI } from "@/services/aiService";
 import { deleteTask, postTask, updateTask } from "@/services/taskService";
 import { getChatHistory, replaceChatHistory } from "@/services/chatService";
 
-type Message = {
+/**
+ * Represents a single message in the chat interface.
+ */
+interface Message {
   role: "user" | "bot";
   text: string;
-};
+}
 
-export default function AIChat({
-  setRefresh,
-}: {
+/**
+ * Structure for normalized AI responses.
+ */
+interface AIResponse {
+  type: "chat" | "goal" | "task";
+  reply: string;
+  intent: {
+    operation?: "add" | "delete" | "retry" | "complete";
+    data?: {
+      goal?: string;
+      context?: string;
+      name?: string;
+      dueDate?: string;
+      dueTime?: string;
+      description?: string;
+    };
+  };
+  match: {
+    status: string;
+    taskId: string;
+  } | null;
+}
+
+interface AIChatProps {
   setRefresh: React.Dispatch<React.SetStateAction<boolean>>;
-}) {
+}
+
+export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement {
   const [messages, setMessages] = useState<Message[]>([
     { role: "bot", text: "Hello! How can I help you today?" },
   ]);
-  const [inputValue, setInputValue] = useState("");
-  const [token, setToken] = useState("");
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [inputValue, setInputValue] = useState<string>("");
+  const [token, setToken] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
 
-  // Refs for audio handling
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null); // Track the stream to close it
+  const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback((): void => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTo({
         top: chatContainerRef.current.scrollHeight,
         behavior: "smooth",
       });
     }
-  };
+  }, []);
 
-  // Cleanup: Ensure mic is off if component unmounts
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -50,43 +73,57 @@ export default function AIChat({
 
   useEffect(() => {
     scrollToBottom();
-    const saveMessagesToDB = async () => {
-      await replaceChatHistory(messages, token);
+    const saveMessagesToDB = async (): Promise<void> => {
+      try {
+        await replaceChatHistory(messages, token);
+      } catch {
+        // Error handled silently for background persistence
+      }
     };
-    if (token) {
-      saveMessagesToDB();
+    if (token && messages.length > 0) {
+      void saveMessagesToDB();
     }
-  }, [messages, isLoading, token]);
+  }, [messages, token, scrollToBottom]);
 
   useEffect(() => {
-    setToken(localStorage.getItem("token") || "");
-    setEmail(localStorage.getItem("email") || "");
+    const storedToken = localStorage.getItem("token") || "";
+    setToken(storedToken);
+
+    const fetchChatHistory = async (activeToken: string): Promise<void> => {
+      try {
+        const history = await getChatHistory(activeToken);
+        if (history && Array.isArray(history)) {
+          setMessages(history);
+        }
+      } catch {
+        // Fallback to initial state
+      }
+    };
+
+    if (storedToken) {
+      void fetchChatHistory(storedToken);
+    }
   }, []);
 
-  useEffect(() => {
-    const fetchChatHistory = async () => {
-      if (!token) return;
-      const history = await getChatHistory(token);
-      setMessages(history || []);
-    };
-    fetchChatHistory();
-  }, [token]);
-
-  const normalizeAIResponse = (res: any) => ({
+  const normalizeAIResponse = (res: any): AIResponse => ({
     type: res?.type || "chat",
     reply: res?.reply || "",
     intent: res?.intent || {},
     match: res?.match || null,
   });
 
-  const sendAI = async (updatedMessages: Message[]) => {
-    const email = localStorage.getItem("email");
-    if (!email) return null;
-    const resRaw = await sendToAI(updatedMessages, email);
-    return normalizeAIResponse(resRaw);
+  const sendAI = async (updatedMessages: Message[]): Promise<AIResponse | null> => {
+    const userEmail = localStorage.getItem("email");
+    if (!userEmail) return null;
+    try {
+      const resRaw = await sendToAI(updatedMessages, userEmail);
+      return normalizeAIResponse(resRaw);
+    } catch {
+      return null;
+    }
   };
 
-  const handleSend = async () => {
+  const handleSend = async (): Promise<void> => {
     if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = { role: "user", text: inputValue };
@@ -102,14 +139,13 @@ export default function AIChat({
         return;
       }
 
-      const intent = aiRes.intent || {};
-      const operation = intent.operation;
-      const match = aiRes.match;
-      let botReply = aiRes.reply || "I couldn't understand that request";
+      const { intent, match, type, reply } = aiRes;
+      const operation = intent?.operation;
+      let botReply = reply || "I couldn't understand that request";
 
-      if (aiRes.type === "chat") {
-        setMessages([...updatedMessages, { role: "bot", text: botReply }]);
-      } else if (aiRes.type === "goal") {
+      if (type === "chat") {
+        setMessages((prev) => [...prev, { role: "bot", text: botReply }]);
+      } else if (type === "goal" && intent?.data) {
         const goalRes = await fetch("/api/ai/goal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -119,20 +155,24 @@ export default function AIChat({
             email: localStorage.getItem("email"),
           }),
         });
-        const goalData = await goalRes.json();
-        if (goalData?.plan) {
-          setRefresh((prev) => !prev);
-        } else {
-          setMessages([...updatedMessages, { role: "bot", text: "Failed to generate goal plan" }]);
+
+        if (goalRes.ok) {
+          const goalData = await goalRes.json();
+          if (goalData?.plan) {
+            setMessages((prev) => [...prev, { role: "bot", text: "Goal plan created successfully!" }]);
+            setRefresh((prev) => !prev);
+          } else {
+            setMessages((prev) => [...prev, { role: "bot", text: "Failed to generate goal plan" }]);
+          }
         }
-      } else if (aiRes.type === "task") {
-        if (operation === "add") {
+      } else if (type === "task") {
+        if (operation === "add" && intent?.data) {
           await postTask(
             {
-              name: intent.data?.name,
-              dueDate: intent.data?.dueDate,
-              dueTime: intent.data?.dueTime,
-              description: intent.data?.description || "",
+              name: intent.data.name || "Untitled Task",
+              dueDate: intent.data.dueDate || "",
+              dueTime: intent.data.dueTime || "",
+              description: intent.data.description || "",
               isGoal: false,
               isCompleted: false,
             },
@@ -151,61 +191,59 @@ export default function AIChat({
           botReply = "Done";
           setRefresh((prev) => !prev);
         }
-        setMessages([...updatedMessages, { role: "bot", text: botReply }]);
+        setMessages((prev) => [...prev, { role: "bot", text: botReply }]);
       }
-    } catch (error) {
-      console.error("AI Error:", error);
+    } catch {
+      setMessages((prev) => [...prev, { role: "bot", text: "An error occurred. Please try again." }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleVoice = async () => {
+  const handleVoice = async (): Promise<void> => {
     if (isRecording) {
-      // 1. Stop the recorder
       mediaRecorderRef.current?.stop();
-      
-      // 2. IMPORTANT: Stop the physical hardware (microphone tracks)
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      
       setIsRecording(false);
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream; // Keep reference to close later
-      
+      streamRef.current = stream;
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-      
+      mediaRecorder.ondataavailable = (e: BlobEvent) => audioChunksRef.current.push(e.data);
+
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const formData = new FormData();
         formData.append("file", audioBlob, "voice.webm");
-        
-        const res = await fetch("/api/whisper", { method: "POST", body: formData });
-        const data = await res.json();
-        if (data?.text) setInputValue(data.text);
+
+        try {
+          const res = await fetch("/api/whisper", { method: "POST", body: formData });
+          const data = await res.json();
+          if (data?.text) setInputValue(data.text);
+        } catch {
+          // Voice processing error
+        }
       };
 
       mediaRecorder.start();
       setIsRecording(true);
-    } catch (err) {
-      console.error("Mic error:", err);
+    } catch {
       setIsRecording(false);
     }
   };
 
   return (
     <div className="w-full h-[450px] flex flex-col bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-      {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4 flex items-center justify-between shadow-md z-10">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
@@ -216,7 +254,6 @@ export default function AIChat({
         </div>
       </div>
 
-      {/* Chat History */}
       <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
@@ -238,9 +275,9 @@ export default function AIChat({
         )}
       </div>
 
-      {/* Input Area */}
       <div className="p-4 bg-white border-t border-slate-100 flex gap-2 items-end">
         <button
+          type="button"
           onClick={handleVoice}
           className={`h-10 w-10 shrink-0 flex items-center justify-center rounded-xl transition-all duration-300 ${
             isRecording 
@@ -257,9 +294,10 @@ export default function AIChat({
 
         <div className="flex-1 relative">
           <input
+            type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={(e) => e.key === "Enter" && void handleSend()}
             placeholder="Ask me to schedule something..."
             disabled={isLoading}
             className="w-full bg-slate-50 border border-slate-200 text-sm p-2.5 rounded-xl outline-none focus:border-indigo-400 transition-all"
@@ -267,6 +305,7 @@ export default function AIChat({
         </div>
 
         <button
+          type="button"
           onClick={handleSend}
           disabled={isLoading || !inputValue.trim()}
           className={`h-10 px-4 flex items-center justify-center gap-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-all duration-300 ${
