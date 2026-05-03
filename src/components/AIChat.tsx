@@ -123,82 +123,140 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
     }
   };
 
-  const handleSend = async (): Promise<void> => {
-    if (!inputValue.trim() || isLoading) return;
+  const runAgent = async (res: AIResponse) => {
+  console.log("agent input:", res);
 
-    const userMessage: Message = { role: "user", text: inputValue };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setInputValue("");
-    setIsLoading(true);
+  const { type, intent, match, reply } = res;
 
-    try {
-      const aiRes = await sendAI(updatedMessages);
-      if (!aiRes) {
-        setIsLoading(false);
-        return;
-      }
+  if (type === "chat") {
+    setMessages((prev) => [...prev, { role: "bot", text: reply }]);
+    return;
+  }
 
-      const { intent, match, type, reply } = aiRes;
-      const operation = intent?.operation;
-      let botReply = reply || "I couldn't understand that request";
+  if (type === "goal") {
+    const goalRes = await fetch("/api/ai/goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goal: intent?.data?.goal,
+        context: intent?.data?.context,
+        email: localStorage.getItem("email"),
+      }),
+    });
 
-      if (type === "chat") {
-        setMessages((prev) => [...prev, { role: "bot", text: botReply }]);
-      } else if (type === "goal" && intent?.data) {
-        const goalRes = await fetch("/api/ai/goal", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            goal: intent.data.goal,
-            context: intent.data.context,
-            email: localStorage.getItem("email"),
-          }),
-        });
+    const data = await goalRes.json();
+    console.log("goal api:", data);
 
-        if (goalRes.ok) {
-          const goalData = await goalRes.json();
-          if (goalData?.plan) {
-            setMessages((prev) => [...prev, { role: "bot", text: "Goal plan created successfully!" }]);
-            setRefresh((prev) => !prev);
-          } else {
-            setMessages((prev) => [...prev, { role: "bot", text: "Failed to generate goal plan" }]);
-          }
-        }
-      } else if (type === "task") {
-        if (operation === "add" && intent?.data) {
-          await postTask(
-            {
-              name: intent.data.name || "Untitled Task",
-              dueDate: intent.data.dueDate || "",
-              dueTime: intent.data.dueTime || "",
-              description: intent.data.description || "",
-              isGoal: false,
-              isCompleted: false,
-            },
-            token
-          );
-          botReply = "Task added successfully";
-          setRefresh((prev) => !prev);
-        }
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "bot",
+        text: data?.plan
+          ? "Goal plan created successfully!"
+          : "Failed to create goal",
+      },
+    ]);
 
-        if (match?.status === "matched") {
-          const taskId = match.taskId;
-          const userEmail = localStorage.getItem("email") || "";
-          if (operation === "delete") await deleteTask(userEmail, taskId, token);
-          if (operation === "retry") await updateTask(userEmail, taskId, false, token);
-          if (operation === "complete") await updateTask(userEmail, taskId, true, token);
-          botReply = "Done";
-          setRefresh((prev) => !prev);
-        }
-        setMessages((prev) => [...prev, { role: "bot", text: botReply }]);
-      }
-    } catch {
-      setMessages((prev) => [...prev, { role: "bot", text: "An error occurred. Please try again." }]);
-    } finally {
-      setIsLoading(false);
+    setRefresh((p) => !p);
+    return;
+  }
+
+  if (type === "task") {
+    const email = localStorage.getItem("email") || "";
+
+    // ADD TASK
+    if (intent?.operation === "add") {
+      await postTask(
+        {
+          name: intent?.data?.name || "Untitled Task",
+          dueDate: intent?.data?.dueDate || "",
+          dueTime: intent?.data?.dueTime || "",
+          description: intent?.data?.description || "",
+          isGoal: false,
+          isCompleted: false,
+        },
+        token
+      );
+
+      console.log("task added");
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: "Task added successfully" },
+      ]);
+
+      setRefresh((p) => !p);
+      return;
     }
-  };
+
+    // MATCHED TASK OPS
+    if (match?.status === "matched") {
+      const taskId = match.taskId;
+
+      console.log("task matched:", taskId);
+
+      if (intent?.operation === "delete") {
+        await deleteTask(email, taskId, token);
+      }
+
+      if (intent?.operation === "retry") {
+        await updateTask(email, taskId, false, token);
+      }
+
+      if (intent?.operation === "complete") {
+        await updateTask(email, taskId, true, token);
+      }
+
+      setMessages((prev) => [...prev, { role: "bot", text: "Done" }]);
+
+      setRefresh((p) => !p);
+      return;
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "bot", text: reply || "Task not processed" },
+    ]);
+
+    return;
+  }
+
+  // fallback
+  setMessages((prev) => [
+    ...prev,
+    { role: "bot", text: reply || "Unsupported response" },
+  ]);
+};
+
+  const handleSend = async (): Promise<void> => {
+  if (!inputValue.trim() || isLoading) return;
+
+  const userMessage: Message = { role: "user", text: inputValue };
+  const updatedMessages = [...messages, userMessage];
+
+  setMessages(updatedMessages);
+  setInputValue("");
+  setIsLoading(true);
+
+  try {
+    const aiRes = await sendAI(updatedMessages);
+
+    console.log("final AI:", aiRes);
+
+    if (!aiRes) return;
+
+    await runAgent(aiRes);
+  } catch (err) {
+    console.log("handleSend error:", err);
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "bot", text: "Something went wrong" },
+    ]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleVoice = async (): Promise<void> => {
     if (isRecording) {
