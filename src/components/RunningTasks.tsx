@@ -76,13 +76,23 @@ export default function RunningTasks({
           );
         });
 
-      const formattedGoals = (rawGoals || []).map((g: any) => ({
-        id: g.id,
-        title: g.title || "Goal",
-        description: g.goal || "",
-        days: g.days || [],
-      }));
+     const formattedGoals = (rawGoals || []).map((g: any) => {
+  const created = new Date(g.createdAt);
 
+  const formattedDate = created.toLocaleDateString();
+  const formattedTime = created.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return {
+    id: g.id,
+    title: g.title || "Goal",
+    description: `${g.goal || ""} (Created: ${formattedDate} ${formattedTime})`,
+    days: g.days || [],
+    createdAt: g.createdAt,
+  };
+});
       const prevTasks = prevTasksRef.current;
 
       const prevIds = new Set(prevTasks.map((t) => t.id));
