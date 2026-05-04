@@ -64,22 +64,25 @@ export const getTasks = async (token: string) => {
 };
 
 export const updateTask = async (
-  email: string,
-  taskId: string,
-  isCompleted: boolean,
+  data: {
+    taskId: string;
+    name?: string;
+    description?: string;
+    dueDate?: string;
+    dueTime?: string;
+    isCompleted?: boolean;
+  },
   token: string
 ) => {
+  console.log("Sending update:", data);
+
   const res = await fetch(`/api/tasks`, {
     method: "PUT",
     headers: {
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${token}`,
-},
-    body: JSON.stringify({
-      email,
-      taskId,
-      isCompleted,
-    }),
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
   });
 
   const result = await res.json();
