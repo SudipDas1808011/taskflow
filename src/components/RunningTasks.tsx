@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { TaskItem } from "@/types/types";
 import { getTasks, updateTask, deleteTask } from "@/services/taskService";
 import GoalDetailsModal from "./GoalDetailsModal";
@@ -44,75 +44,101 @@ export default function RunningTasks({
   const [editTask, setEditTask] = useState<TaskItem | null>(null);
   const [openEditModal, setOpenEditModal] = useState(false);
 
+  const prevTasksRef = useRef<TaskItem[]>([]);
+
   useEffect(() => {
     setEmail(localStorage.getItem("email") || "");
     setToken(localStorage.getItem("token") || "");
   }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
+  const loadData = async () => {
+    try {
+      setLoading(true);
 
-        const res = await getTasks(localStorage.getItem("token") || "");
+      const res = await getTasks(localStorage.getItem("token") || "");
 
-        const rawTasks: TaskItem[] = res?.tasks || [];
-        const rawGoals: any[] = res?.goals || [];
+      const rawTasks: TaskItem[] = res?.tasks || [];
+      const rawGoals: any[] = res?.goals || [];
 
-        const now = new Date();
+      const now = new Date();
 
-        const filteredTasks = rawTasks
-          .filter((t) => {
-            if (t.isCompleted) return false;
-            const taskTime = new Date(`${t.dueDate}T${t.dueTime}`);
-            return taskTime >= now;
-          })
-          .sort((a, b) => {
-            return (
-              new Date(`${a.dueDate}T${a.dueTime}`).getTime() -
-              new Date(`${b.dueDate}T${b.dueTime}`).getTime()
-            );
-          });
+      const filteredTasks = rawTasks
+        .filter((t) => {
+          if (t.isCompleted) return false;
+          const taskTime = new Date(`${t.dueDate}T${t.dueTime}`);
+          return taskTime >= now;
+        })
+        .sort((a, b) => {
+          return (
+            new Date(`${a.dueDate}T${a.dueTime}`).getTime() -
+            new Date(`${b.dueDate}T${b.dueTime}`).getTime()
+          );
+        });
 
-        const formattedGoals = (rawGoals || []).map((g: any) => ({
-          id: g.id,
-          title: g.title || "Goal",
-          description: g.goal || "",
-          days: g.days || [],
-        }));
+      const formattedGoals = (rawGoals || []).map((g: any) => ({
+        id: g.id,
+        title: g.title || "Goal",
+        description: g.goal || "",
+        days: g.days || [],
+      }));
 
+      const prevTasks = prevTasksRef.current;
+
+      const prevIds = new Set(prevTasks.map((t) => t.id));
+      const newIds = new Set(filteredTasks.map((t) => t.id));
+
+      const removedIds = prevTasks
+        .filter((t) => t.id && !newIds.has(t.id))
+        .map((t) => t.id as string);
+
+      if (removedIds.length > 0) {
+        console.log("Refresh remove animation:", removedIds);
+
+        setAnimatingIds((prev) => [...prev, ...removedIds]);
+
+        setTimeout(() => {
+          setTasks(filteredTasks);
+          setGoals(formattedGoals);
+          setAnimatingIds([]);
+          console.log("Refresh UI updated after animation");
+        }, 300);
+      } else {
         setTasks(filteredTasks);
         setGoals(formattedGoals);
-      } catch (err) {
-        console.error("Error loading data:", err);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    loadData();
-  }, [refresh]);
+      prevTasksRef.current = filteredTasks;
+    } catch (err) {
+      console.error("Error loading data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadData();
+}, [refresh]);
 
   useEffect(() => {
-  const interval = setInterval(() => {
-    const now = new Date();
+    const interval = setInterval(() => {
+      const now = new Date();
 
-    const hasOverdue = tasks.some((task) => {
-      if (task.isCompleted) return false;
+      const hasOverdue = tasks.some((task) => {
+        if (task.isCompleted) return false;
 
-      const taskTime = new Date(`${task.dueDate}T${task.dueTime}`);
-      return taskTime < now;
-    });
+        const taskTime = new Date(`${task.dueDate}T${task.dueTime}`);
+        return taskTime < now;
+      });
 
-    if (hasOverdue) {
-      console.log("Overdue task detected from RunningTasks → refreshing UI");
+      if (hasOverdue) {
+        console.log("Overdue task detected from RunningTasks → refreshing UI");
 
-      setRefresh((prev) => !prev);
-    }
-  }, 30000); // every 30 sec
+        setRefresh((prev) => !prev);
+      }
+    }, 30000); // every 30 sec
 
-  return () => clearInterval(interval);
-}, [tasks, setRefresh]);
+    return () => clearInterval(interval);
+  }, [tasks, setRefresh]);
 
   useEffect(() => {
     if (tasks.length > prevTaskCount && activeTab !== "tasks") {
@@ -160,38 +186,38 @@ export default function RunningTasks({
     setOpenEditModal(true);
   };
   const handleUpdateTask = async (updatedTask: TaskItem) => {
-  if (!updatedTask.id) return;
+    if (!updatedTask.id) return;
 
-  try {
-    console.log("Updating task:", updatedTask);
+    try {
+      console.log("Updating task:", updatedTask);
 
-    const res = await updateTask(
-      {
-        taskId: updatedTask.id,
-        name: updatedTask.name,
-        description: updatedTask.description,
-        dueDate: updatedTask.dueDate,
-        dueTime: updatedTask.dueTime,
-        isCompleted: updatedTask.isCompleted,
-      },
-      token
-    );
+      const res = await updateTask(
+        {
+          taskId: updatedTask.id,
+          name: updatedTask.name,
+          description: updatedTask.description,
+          dueDate: updatedTask.dueDate,
+          dueTime: updatedTask.dueTime,
+          isCompleted: updatedTask.isCompleted,
+        },
+        token
+      );
 
-    console.log("Edit update response:", res);
+      console.log("Edit update response:", res);
 
-    setTasks((prev) =>
-      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
-    );
+      setTasks((prev) =>
+        prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+      );
 
-    setOpenEditModal(false);
-    setEditTask(null);
+      setOpenEditModal(false);
+      setEditTask(null);
 
-    console.log("Update success");
+      console.log("Update success");
 
-  } catch (err) {
-    console.log("Update error:", err);
-  }
-};
+    } catch (err) {
+      console.log("Update error:", err);
+    }
+  };
   const handleDelete = async (item: any, isGoal = false) => {
     if (!item.id) return;
 
