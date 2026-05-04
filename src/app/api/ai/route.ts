@@ -34,14 +34,14 @@ export async function POST(req: Request) {
     const operation = intent?.operation;
 
     // =========================
-    // 🔥 FIXED SAFETY GUARD
+    // INFORMATION 
     // =========================
-    if (!intent?.type || !operation) {
+    if (intent.type === "information") {
       return NextResponse.json({
-        type: "chat",
-        intent: {},
+        type: "information",
+        intent,
         match: null,
-        reply: intent?.reply || "I couldn't understand that. Can you rephrase?",
+        reply: intent.reply || "Let me check that for you",
       });
     }
 
