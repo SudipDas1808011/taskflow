@@ -194,20 +194,24 @@ export function History({
     });
 
   const incompletedTasks = tasks
-    .filter((t) => !t.isCompleted)
-    .sort((a, b) => {
-      return (
-        new Date(`${b.dueDate}T${b.dueTime}`).getTime() -
-        new Date(`${a.dueDate}T${a.dueTime}`).getTime()
-      );
-    });
+  .filter((t) => {
+    if (t.isCompleted) return false;
 
+    const taskDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
+    return taskDateTime >= now; 
+  })
+  .sort((a, b) => {
+    return (
+      new Date(`${a.dueDate}T${a.dueTime}`).getTime() -
+      new Date(`${b.dueDate}T${b.dueTime}`).getTime()
+    );
+  });
   const dueTasks = tasks.filter((t) => {
     if (t.isCompleted) return false;
     const taskDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
     return taskDateTime < now;
   });
-  localStorage.setItem("completedTask", JSON.stringify(completedTasks));
+  localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
   localStorage.setItem("dueTasks", JSON.stringify(dueTasks));
   localStorage.setItem("runningTasks",JSON.stringify(incompletedTasks));
   const getStatusStyle = (type: string) => {
