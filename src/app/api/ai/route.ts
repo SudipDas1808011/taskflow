@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { contentPrompt, matchPrompt } from "@/utils/prompt";
 import OpenAI from "openai";
+import { withAuth } from "@/lib/withAuth";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, userData) => {
   try {
     const { messages } = await req.json();
 
@@ -78,16 +79,7 @@ export async function POST(req: Request) {
         operation === "retry" ||
         operation === "complete")
     ) {
-      const email = req.headers.get("email");
-
-      if (!email) {
-        return NextResponse.json({
-          type: "chat",
-          intent,
-          match: null,
-          reply: "Unauthorized",
-        });
-      }
+      const email = userData.email;
 
       const mongoClient = await clientPromise;
       const db = mongoClient.db("taskdb");
@@ -152,4 +144,4 @@ export async function POST(req: Request) {
       reply: "Something went wrong, try again.",
     });
   }
-}
+});

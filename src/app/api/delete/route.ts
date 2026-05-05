@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { MongoClient, Db, UpdateResult } from "mongodb";
+import { withAuth } from "@/lib/withAuth";
 
 /**
  * Interface for the expected DELETE request body.
  */
 interface DeleteRequestBody {
-  email: string;
   id: string | number;
   type: "task" | "goal";
 }
@@ -15,12 +15,13 @@ interface DeleteRequestBody {
  * Handles the deletion of tasks or goals from a user's record in MongoDB.
  * Ensures strict typing for request payload and database operations.
  */
-export async function DELETE(req: Request): Promise<NextResponse> {
+export const DELETE = withAuth(async (req, userData) => {
   try {
     const body: DeleteRequestBody = await req.json();
-    const { email, id, type } = body;
+    const { id, type } = body;
+    const email = userData.email;
 
-    if (!email || !id || !type) {
+    if (!id || !type) {
       return NextResponse.json(
         { success: false, message: "Missing required fields" },
         { status: 400 }
@@ -77,4 +78,4 @@ export async function DELETE(req: Request): Promise<NextResponse> {
       { status: 500 }
     );
   }
-}
+});

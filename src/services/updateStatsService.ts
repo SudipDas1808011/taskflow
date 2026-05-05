@@ -1,11 +1,12 @@
-export async function updateStats(email: string, stats: any) {
+export async function updateStats(token: string, stats: any) {
   try {
     const res = await fetch("/api/update-stats", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email, stats }),
+      body: JSON.stringify({ stats }),
     });
 
     console.log("Update Stats Raw Response:", res);

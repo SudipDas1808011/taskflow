@@ -1,5 +1,5 @@
 export async function updateSubTask(
-  email: string,
+  token: string,
   goalId: string,
   taskId: string,
   done: boolean
@@ -9,8 +9,9 @@ export async function updateSubTask(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email, goalId, taskId, done }),
+      body: JSON.stringify({ goalId, taskId, done }),
     });
 
     console.log("Update response status:", res.status);

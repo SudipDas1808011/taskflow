@@ -32,7 +32,6 @@ export default function RunningTasks({
   const [activeTab, setActiveTab] = useState<"tasks" | "goals">("tasks");
   const [loading, setLoading] = useState(true);
 
-  const [email, setEmail] = useState("");
   const [token, setToken] = useState("");
 
   const [selectedGoal, setSelectedGoal] = useState<GoalDetails | null>(null);
@@ -47,7 +46,6 @@ export default function RunningTasks({
   const prevTasksRef = useRef<TaskItem[]>([]);
 
   useEffect(() => {
-    setEmail(localStorage.getItem("email") || "");
     setToken(localStorage.getItem("token") || "");
   }, []);
 
@@ -109,12 +107,14 @@ export default function RunningTasks({
 
         setTimeout(() => {
           setTasks(filteredTasks);
+          localStorage.setItem("runningTasks", JSON.stringify(filteredTasks));
           setGoals(formattedGoals);
           setAnimatingIds([]);
           console.log("Refresh UI updated after animation");
         }, 300);
       } else {
         setTasks(filteredTasks);
+        localStorage.setItem("runningTasks", JSON.stringify(filteredTasks));
         setGoals(formattedGoals);
       }
 
@@ -235,11 +235,12 @@ export default function RunningTasks({
 
     try {
       await deleteTask(
-        email,
+        "",
         item.id,
         token,
         isGoal ? "goal" : "task"
       );
+
 
       setTimeout(() => {
         if (isGoal) {

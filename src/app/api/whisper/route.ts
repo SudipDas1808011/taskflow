@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/withAuth";
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req) => {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -32,4 +33,4 @@ export async function POST(req: Request) {
     console.log("whisper error:", err);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
-}
+});

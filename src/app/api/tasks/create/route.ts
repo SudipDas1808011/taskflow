@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import jwt from "jsonwebtoken";
+import { withAuth } from "@/lib/withAuth";
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, userData) => {
   try {
     const body = await req.json();
-
-    const { token, task } = body;
+    const { task } = body;
 
     console.log("Incoming task:", task);
 
-    if (!token) {
-      return NextResponse.json({ message: "No token" }, { status: 401 });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    const email = decoded.email;
+    const email = userData.email;
 
     const client = await clientPromise;
     const db = client.db("taskdb");
@@ -49,4 +43,4 @@ export async function POST(req: Request) {
     console.error("Create task error:", err);
     return NextResponse.json({ message: "Server error" }, { status: 500 });
   }
-}
+});

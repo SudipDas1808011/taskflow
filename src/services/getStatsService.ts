@@ -1,11 +1,11 @@
-export async function getStats(email: string) {
+export async function getStats(token: string) {
   try {
     const res = await fetch("/api/get-stats", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email }),
     });
 
     console.log("Get Stats Response:", res);

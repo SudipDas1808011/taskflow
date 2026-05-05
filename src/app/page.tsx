@@ -14,7 +14,6 @@ export default function Home() {
   const [retryTask, setRetryTask] = useState<TaskItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const [email, setEmail] = useState<string> ("");
 
 
   const handleRetry = (task: TaskItem) => {
@@ -24,8 +23,6 @@ export default function Home() {
 
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
-    const email_local = localStorage.getItem("email") || "";
-    setEmail(email_local);
     console.log("Loaded token:", savedToken);
     if (savedToken) {
       setToken(savedToken);
@@ -38,7 +35,7 @@ export default function Home() {
   const handleCreated = async () => {
     if (retryTask?.id) {
       try {
-        await deleteTask(email,retryTask.id,token);
+        await deleteTask("",retryTask.id,token);
         console.log("Old task deleted after retry");
       } catch (err) {
         console.error("Failed to delete old task:", err);

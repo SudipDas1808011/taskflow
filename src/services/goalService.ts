@@ -9,8 +9,7 @@ export const generateGoalPlan = async (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        email: email,
-        token: token,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         goal,

@@ -15,18 +15,21 @@ export default function Login({ onLoginSuccess }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     if (loading) return;
 
     if (!email.includes("@")) {
-      alert("Please enter a valid email address.");
+      setError("Please enter a valid email address.");
       return;
     }
 
     if (password.length < 4) {
-      alert("Password must be at least 4 characters long.");
+      setError("Password must be at least 4 characters long.");
       return;
     }
 
@@ -43,14 +46,10 @@ export default function Login({ onLoginSuccess }: Props) {
         body: JSON.stringify({ email, password }),
       });
 
-      console.log("Raw response:", res);
-
       let data: AuthResponse = {};
 
       try {
         const text = await res.text();
-        console.log("Response text:", text);
-
         if (text) {
           data = JSON.parse(text);
         }
@@ -58,9 +57,8 @@ export default function Login({ onLoginSuccess }: Props) {
         console.error("JSON parse error:", parseErr);
       }
 
-      console.log("Parsed response:", data);
-
       if (!res.ok) {
+        // This catches the "Email already exists" message from your backend
         throw new Error(data.message || "Authentication failed");
       }
 
@@ -69,17 +67,14 @@ export default function Login({ onLoginSuccess }: Props) {
       }
 
       localStorage.setItem("token", data.token);
-      localStorage.setItem("email",email);
-      console.log("Token saved:", data.token);
+      localStorage.setItem("email", email);
 
       setEmail("");
       setPassword("");
-
       onLoginSuccess(data.token);
 
     } catch (err: any) {
-      console.error("Auth error:", err);
-      alert(err.message || "Network error");
+      setError(err.message || "Network error");
     } finally {
       setLoading(false);
     }
@@ -90,7 +85,7 @@ export default function Login({ onLoginSuccess }: Props) {
       
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-center">
         <h2 className="text-white font-bold text-xl">
-          {isLogin ? "Welcome Back" : "Create Account"}
+          {isLogin ? "Welcome" : "Create Account"}
         </h2>
         <p className="text-indigo-100 text-xs mt-1">
           {isLogin
@@ -100,6 +95,17 @@ export default function Login({ onLoginSuccess }: Props) {
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+        
+        {error && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-3 rounded shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-amber-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <p className="text-xs text-amber-800 font-medium">{error}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-slate-600 ml-1">
@@ -112,9 +118,8 @@ export default function Login({ onLoginSuccess }: Props) {
             disabled={loading}
             required
             onChange={(e) => setEmail(e.target.value)}
-           className="border-2 border-slate-100 p-3 rounded-lg text-sm focus:font-bold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
-
-            />
+            className="border-2 border-slate-100 p-3 rounded-lg text-sm focus:font-bold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+          />
         </div>
 
         <div className="flex flex-col gap-1">
@@ -147,7 +152,12 @@ export default function Login({ onLoginSuccess }: Props) {
               : "Already have an account?"}
             <button
               type="button"
-              onClick={() => !loading && setIsLogin(!isLogin)}
+              onClick={() => {
+                if (!loading) {
+                  setIsLogin(!isLogin);
+                  setError(null);
+                }
+              }}
               className="ml-1 text-indigo-600 hover:text-indigo-800 font-bold"
             >
               {isLogin ? "Register now" : "Log in"}

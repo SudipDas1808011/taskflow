@@ -3,14 +3,16 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import clientPromise from "@/lib/mongodb";
 import crypto from "crypto";
+import { withAuth } from "@/lib/withAuth";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, userData) => {
   try {
-    const { goal, context, email } = await req.json();
+    const { goal, context } = await req.json();
+    const email = userData.email;
 
     console.log("Goal request received:", { goal, context, email });
 
@@ -68,4 +70,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
+});

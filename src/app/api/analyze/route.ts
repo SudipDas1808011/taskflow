@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { withAuth } from "@/lib/withAuth";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req) => {
   try {
     const body = await req.json();
     console.log("Incoming Data:", body);
@@ -74,4 +75,4 @@ Format:
     console.log("API Error:", error);
     return NextResponse.json({ message: "Error parsing AI response" }, { status: 500 });
   }
-}
+});

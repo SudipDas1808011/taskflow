@@ -1,7 +1,6 @@
-
-
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { withAuth } from "@/lib/withAuth";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -35,7 +34,7 @@ function logTokenUsage(usage: any, model: string = "gpt-4o-mini") {
 
 
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: Request) => {
   try {
     const { query, tasks } = await req.json();
 
@@ -82,4 +81,4 @@ DONE: ${tasks.completedTasks?.join(" | ") || "None"}
   } catch (err) {
     return NextResponse.json({ reply: "Error" }, { status: 500 });
   }
-}
+});

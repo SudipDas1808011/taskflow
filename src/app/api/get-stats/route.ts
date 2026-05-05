@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
+import { withAuth } from "@/lib/withAuth";
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, userData) => {
   try {
-    const { email } = await req.json();
+    const email = userData.email;
 
     console.log("Fetching stats for:", email);
 
@@ -23,4 +24,4 @@ export async function POST(req: Request) {
     console.log("Get Stats Error:", err);
     return NextResponse.json([], { status: 500 });
   }
-}
+});

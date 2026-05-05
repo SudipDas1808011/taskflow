@@ -1,15 +1,9 @@
-import { getUserFromReq } from "@/lib/getUser";
+import { withAuth } from "@/lib/withAuth";
 import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 
-export async function PUT(req: Request) {
+export const PUT = withAuth(async (req, userData) => {
   try {
-    const userData = getUserFromReq(req);
-
-    if (!userData) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
     const { messages } = await req.json();
 
     const client = await clientPromise;
@@ -47,16 +41,10 @@ export async function PUT(req: Request) {
       { status: 500 }
     );
   }
-}
+});
 
-export async function GET(req: Request) {
+export const GET = withAuth(async (req, userData) => {
   try {
-    const userData = getUserFromReq(req);
-
-    if (!userData) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
     const client = await clientPromise;
     const db = client.db("taskdb");
 
@@ -83,4 +71,4 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+});

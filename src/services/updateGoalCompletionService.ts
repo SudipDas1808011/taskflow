@@ -1,5 +1,5 @@
 export async function updateGoalCompletion(
-  email: string,
+  token: string,
   goalId: string,
   completionPercentage: number
 ) {
@@ -7,9 +7,9 @@ export async function updateGoalCompletion(
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      email,
       goalId,
       completionPercentage,
     }),

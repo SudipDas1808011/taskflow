@@ -7,7 +7,6 @@ export const postTask = async (taskData: any, token: string) => {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        token,
         task: taskData,
       }),
     });
@@ -43,7 +42,6 @@ export const getTasks = async (token: string) => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ token }),
     });
 
     console.log("Get tasks status:", response.status);
@@ -97,7 +95,7 @@ export const updateTask = async (
 };
 
 export const deleteTask = async (
-  email: string,
+  email: string, // Kept for signature compatibility if needed, but not used in body
   id: string,
   token: string,
   type: "task" | "goal" = "task"
@@ -109,7 +107,6 @@ export const deleteTask = async (
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      email,
       id,
       type,
     }),

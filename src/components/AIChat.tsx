@@ -114,10 +114,9 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
   });
 
   const sendAI = async (updatedMessages: Message[]): Promise<AIResponse | null> => {
-    const userEmail = localStorage.getItem("email");
-    if (!userEmail) return null;
+    if (!token) return null;
     try {
-      const resRaw = await sendToAI(updatedMessages, userEmail);
+      const resRaw = await sendToAI(updatedMessages, token);
       return normalizeAIResponse(resRaw);
     } catch {
       return null;
@@ -152,7 +151,10 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
 
         const infoRes = await fetch("/api/ai/information", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
           body: JSON.stringify({
             query: intent?.data?.query,
             tasks: { runningTasks, dueTasks, completedTasks },
@@ -171,11 +173,13 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
     if (type === "goal") {
       const goalRes = await fetch("/api/ai/goal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify({
           goal: intent?.data?.goal,
           context: intent?.data?.context,
-          email: localStorage.getItem("email"),
         }),
       });
 
@@ -197,8 +201,6 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
     }
 
     if (type === "task") {
-      const email = localStorage.getItem("email") || "";
-
       // ADD TASK
       if (intent?.operation === "add") {
         await postTask(
@@ -231,7 +233,7 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
         console.log("task matched:", taskId);
 
         if (intent?.operation === "delete") {
-          await deleteTask(email, taskId, token);
+          await deleteTask("", taskId, token);
         }
 
         if (intent?.operation === "retry") {
@@ -323,7 +325,13 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
         formData.append("file", audioBlob, "voice.webm");
 
         try {
-          const res = await fetch("/api/whisper", { method: "POST", body: formData });
+          const res = await fetch("/api/whisper", { 
+            method: "POST", 
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            body: formData 
+          });
           const data = await res.json();
           if (data?.text) setInputValue(data.text);
         } catch {

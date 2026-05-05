@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
+import { withAuth } from "@/lib/withAuth";
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, userData) => {
   try {
-    const { email, goalId, taskId, done } = await req.json();
+    const { goalId, taskId, done } = await req.json();
+    const email = userData.email;
 
     console.log("Update subtask request:", { email, goalId, taskId, done });
 
@@ -48,4 +50,4 @@ export async function POST(req: Request) {
     console.log("Update subtask error:", err);
     return NextResponse.json({ success: false }, { status: 500 });
   }
-}
+});

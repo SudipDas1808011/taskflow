@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { User } from "@/types/types";
+import { withAuth } from "@/lib/withAuth";
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, userData) => {
   try {
-    const { email, stats } = await req.json();
+    const { stats } = await req.json();
+    const email = userData.email;
 
     console.log("Updating DB for:", email);
     console.log("Stats:", stats);
@@ -40,4 +42,4 @@ const userCollection = db.collection<User>("users")
       { status: 500 }
     );
   }
-}
+});

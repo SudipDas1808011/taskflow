@@ -102,7 +102,7 @@ export default function GoalDetailsModal({
   }, [isOpen, goal?.id]);
 
   const handleToggle = async (id: string) => {
-    const email = localStorage.getItem("email") || "";
+    const token = localStorage.getItem("token") || "";
 
     const updated = subtasks.map((t) =>
       t.id === id ? { ...t, isCompleted: !t.isCompleted } : t
@@ -113,13 +113,12 @@ export default function GoalDetailsModal({
     const changed = updated.find((t) => t.id === id);
 
     await updateSubTask(
-      email,
+      token,
       activeGoal.id,
       id,
       changed?.isCompleted || false
     );
 
-    const token = localStorage.getItem("token") || "";
     const data = await getTasks(token);
 
     const freshGoal = data?.goals?.find((g: any) => g.id === goal.id);
@@ -259,7 +258,7 @@ export default function GoalDetailsModal({
         <div className="p-3 border-t flex justify-end bg-slate-50">
           <button
             onClick={async () => {
-              const email = localStorage.getItem("email") || "";
+              const token = localStorage.getItem("token") || "";
 
               const total = subtasks.length;
               const done = subtasks.filter((t) => t.isCompleted).length;
@@ -271,7 +270,7 @@ export default function GoalDetailsModal({
               console.log("Saving completion:", completionPercentage);
 
               await updateGoalCompletion(
-                email,
+                token,
                 activeGoal.id,
                 completionPercentage
               );

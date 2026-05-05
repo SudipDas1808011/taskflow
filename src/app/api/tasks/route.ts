@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { getUserFromReq } from "@/lib/getUser";
-import { User} from "@/types/types";
+import { withAuth } from "@/lib/withAuth";
+import { User } from "@/types/types";
 
-
-
-export async function GET(req: Request) {
+export const GET = withAuth(async (req, userData) => {
   try {
-    const userData = getUserFromReq(req);
-
-    if (!userData) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
     const client = await clientPromise;
     const db = client.db("taskdb");
 
@@ -38,17 +30,10 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+});
 
-
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, userData) => {
   try {
-    const userData = getUserFromReq(req);
-
-    if (!userData) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await req.json();
     console.log("Incoming task:", body);
 
@@ -86,22 +71,10 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
+});
 
-
-
-export async function PUT(req: Request) {
+export const PUT = withAuth(async (req, userData) => {
   try {
-    const userData = getUserFromReq(req);
-
-    if (!userData) {
-      console.log("Unauthorized access attempt");
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
     const body = await req.json();
     console.log("Incoming body:", body);
 
@@ -115,7 +88,6 @@ export async function PUT(req: Request) {
       );
     }
 
-    // 🧠 Build dynamic update fields
     const updateFields: any = {};
 
     Object.keys(rest).forEach((key) => {
@@ -168,15 +140,10 @@ export async function PUT(req: Request) {
       { status: 500 }
     );
   }
-}
-export async function DELETE(req: Request) {
+});
+
+export const DELETE = withAuth(async (req, userData) => {
   try {
-    const userData = getUserFromReq(req);
-
-    if (!userData) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
     const { taskId } = await req.json();
 
     const client = await clientPromise;
@@ -201,4 +168,4 @@ export async function DELETE(req: Request) {
     console.log(err);
     return NextResponse.json({ message: "Server error" }, { status: 500 });
   }
-}
+});

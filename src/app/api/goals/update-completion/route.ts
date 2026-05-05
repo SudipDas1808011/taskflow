@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
+import { withAuth } from "@/lib/withAuth";
 
-export async function PUT(req: Request) {
+export const PUT = withAuth(async (req, userData) => {
   try {
-    const { email, goalId, completionPercentage } = await req.json();
+    const { goalId, completionPercentage } = await req.json();
+    const email = userData.email;
 
     console.log("update-completion payload:", {
       email,
@@ -44,4 +46,4 @@ export async function PUT(req: Request) {
       { status: 500 }
     );
   }
-}
+});
