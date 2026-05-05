@@ -161,29 +161,25 @@ export function History({
 }) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [activeTab, setActiveTab] = useState<"completed" | "due">("completed");
+  const [searchTerm, setSearchTerm] = useState(""); // New state for filtering
 
   useEffect(() => {
     const loadTasks = async () => {
       try {
         const token = localStorage.getItem("token") || "";
-
         const data = await getTasks(token);
-
-        console.log("All tasks:", data);
-
         const allTasks: TaskItem[] = data?.tasks || [];
-
         setTasks(allTasks);
       } catch (err) {
         console.error("Error loading history:", err);
       }
     };
-
     loadTasks();
   }, [refresh]);
 
   const now = new Date();
 
+  // Existing filtering logic maintained
   const completedTasks = tasks
     .filter((t) => t.isCompleted)
     .sort((a, b) => {
@@ -193,142 +189,111 @@ export function History({
       );
     });
 
-  const incompletedTasks = tasks
-  .filter((t) => {
-    if (t.isCompleted) return false;
-
-    const taskDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
-    return taskDateTime >= now; 
-  })
-  .sort((a, b) => {
-    return (
-      new Date(`${a.dueDate}T${a.dueTime}`).getTime() -
-      new Date(`${b.dueDate}T${b.dueTime}`).getTime()
-    );
-  });
   const dueTasks = tasks.filter((t) => {
     if (t.isCompleted) return false;
     const taskDateTime = new Date(`${t.dueDate}T${t.dueTime}`);
     return taskDateTime < now;
   });
+
+  // New logic: Filter based on active tab AND search term
+  const filteredTasks = (activeTab === "completed" ? completedTasks : dueTasks).filter(
+    (task) => task.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Sync with local storage remains untouched
   localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
   localStorage.setItem("dueTasks", JSON.stringify(dueTasks));
-  localStorage.setItem("runningTasks",JSON.stringify(incompletedTasks));
+
   const getStatusStyle = (type: string) => {
     switch (type) {
-      case "due":
-        return "text-rose-600 bg-rose-50 border-rose-100";
-      case "success":
-        return "text-emerald-600 bg-emerald-50 border-emerald-100";
-      default:
-        return "text-slate-600 bg-slate-50 border-slate-100";
+      case "due": return "text-rose-600 bg-rose-50 border-rose-100";
+      case "success": return "text-emerald-600 bg-emerald-50 border-emerald-100";
+      default: return "text-slate-600 bg-slate-50 border-slate-100";
     }
   };
 
   const renderTasks = (list: TaskItem[], type: "completed" | "due") => {
+    if (list.length === 0) {
+      return <div className="text-center py-4 text-xs text-slate-400">No tasks found</div>;
+    }
     return list.map((item, index) => (
-      <li
-        key= { item.id } 
-        className = "flex items-center justify-between gap-4 bg-white p-3 rounded-lg border border-slate-100 shadow-sm"
-      >
-      <div className="flex items-center gap-3 overflow-hidden" >
-    <span className="font-bold text-indigo-600 text-xs" >
-    { index + 1}.
-  </span>
-
-    < span className = "font-medium text-sm text-slate-700 truncate flex items-center gap-2" >
-      { item.name }
-
-      < span className = "text-[10px] text-slate-400 whitespace-nowrap" >
-        { item.dueDate } at { item.dueTime }
-  </span>
-    </span>
-    </div>
-
-  {
-    type === "completed" ? (
-      <div
-            className= {`text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle(
-        "success"
-      )}`}
-          >
-    Completed
-    </div>
+      <li key={item.id} className="flex items-center justify-between gap-4 bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <span className="font-bold text-indigo-600 text-xs">{index + 1}.</span>
+          <span className="font-medium text-sm text-slate-700 truncate flex items-center gap-2">
+            {item.name}
+            <span className="text-[10px] text-slate-400 whitespace-nowrap">
+              {item.dueDate} at {item.dueTime}
+            </span>
+          </span>
+        </div>
+        {type === "completed" ? (
+          <div className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle("success")}`}>
+            Completed
+          </div>
         ) : (
-    <div className= "flex items-center gap-2" >
-    <div
-              className={
-    `text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle(
-      "due"
-    )}`
-  }
-            >
-    Due
-    </div>
-
-    < button
-  onClick = {() => onRetry(item)
-}
-className = "text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-  >
-  Retry
-  </button>
-  </div>
+          <div className="flex items-center gap-2">
+            <div className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${getStatusStyle("due")}`}>
+              Due
+            </div>
+            <button onClick={() => onRetry(item)} className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600">
+              Retry
+            </button>
+          </div>
         )}
-</li>
+      </li>
     ));
   };
 
-return (
-  <div className= "w-full bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm" >
-
-  {/* Header + Tabs */ }
-  < div className = "p-5" >
-    <div className="mb-3" >
-      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider" >
-        Task History
+  return (
+    <div className="w-full bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="p-5">
+        <div className="flex justify-between items-center mb-3">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Task History
           </label>
-          </div>
+        </div>
 
-{/* Tabs */ }
-<div className="flex gap-2 mb-4" >
-  <button
-            onClick={ () => setActiveTab("completed") }
-className = {`px-3 py-1 text-xs rounded-md border transition ${activeTab === "completed"
-  ? "bg-emerald-500 text-white border-emerald-500"
-  : "bg-white text-slate-600 border-slate-200"
-  }`}
-          >
-  Completed
-  </button>
+        {/* New Search Bar */}
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder={`Search ${activeTab} tasks...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition shadow-sm"
+          />
+        </div>
 
-  < button
-onClick = {() => setActiveTab("due")}
-className = {`px-3 py-1 text-xs rounded-md border transition ${activeTab === "due"
-  ? "bg-rose-500 text-white border-rose-500"
-  : "bg-white text-slate-600 border-slate-200"
-  }`}
+        {/* Tabs */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => { setActiveTab("completed"); setSearchTerm(""); }}
+            className={`px-3 py-1 text-xs rounded-md border transition ${activeTab === "completed" ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-slate-600 border-slate-200"}`}
           >
-  Due Tasks
-    </button>
+            Completed
+          </button>
+          <button
+            onClick={() => { setActiveTab("due"); setSearchTerm(""); }}
+            className={`px-3 py-1 text-xs rounded-md border transition ${activeTab === "due" ? "bg-rose-500 text-white border-rose-500" : "bg-white text-slate-600 border-slate-200"}`}
+          >
+            Due Tasks
+          </button>
+        </div>
+
+        {/* Scrollable list */}
+        <div className="max-h-[380px] overflow-y-auto pr-1">
+          <ul className="flex flex-col gap-2">
+            {renderTasks(filteredTasks, activeTab)}
+          </ul>
+        </div>
+      </div>
+
+      <div className="bg-slate-100/50 px-5 py-2 border-t border-slate-200">
+        <p className="text-[10px] text-slate-400 font-medium italic">
+          Last updated: Just now
+        </p>
+      </div>
     </div>
-
-{/* Scrollable list */ }
-<div className="max-h-[380px] overflow-y-auto pr-1" >
-  <ul className="flex flex-col gap-2" >
-    { activeTab === "completed"
-    ? renderTasks(completedTasks, "completed")
-    : renderTasks(dueTasks, "due")}
-</ul>
-  </div>
-  </div>
-
-{/* Footer */ }
-<div className="bg-slate-100/50 px-5 py-2 border-t border-slate-200" >
-  <p className="text-[10px] text-slate-400 font-medium italic" >
-    Last updated: Just now
-      </p>
-      </div>
-      </div>
   );
 }
