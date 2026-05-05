@@ -45,20 +45,34 @@ DUE: ${tasks.dueTasks?.join(" | ") || "None"}
 DONE: ${tasks.completedTasks?.join(" | ") || "None"}
     `.trim();
 
-    const aiRes = await client.chat.completions.create({
+  const aiRes = await client.chat.completions.create({
+
       model: "gpt-4o-mini",
+
       messages: [
+
         { 
+
           role: "system", 
-          content: "You are a task assistant. Rules: DUE/RUNNING = Not Completed, DONE = Completed. Check list labels to confirm status. Answer concisely." 
+
+          content: "You are a precise task auditor. Rules:\n1. STATUS: DUE/RUNNING = Not Completed, DONE = Completed.\n2. STRICT GROUNDING: Use ONLY the provided Source Data. No mock data.\n3. COUNTING: If asked 'how many times', scan the entire list and provide an exact count of matching occurrences.\n4. RECENCY: If asked 'when' or 'last performed', identify the occurrence with the most recent date/timestamp provided in the list.\n5. NO DATA: If the task or date is missing, reply 'Data not found.'\n6. FORMAT: Answer concisely without conversational filler." 
+
         },
+
         { 
+
           role: "user", 
-          content: `Task Lists:\n${taskContext}\n\nUser Question: ${query}` 
+
+          content: `SOURCE DATA:\n${taskContext}\n\nQUERY: ${query}` 
+
         },
+
       ],
+
       temperature: 0,
+
       max_tokens: 100,
+
     });
 
     logTokenUsage(aiRes.usage);

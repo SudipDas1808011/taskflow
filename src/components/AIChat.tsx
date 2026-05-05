@@ -17,11 +17,12 @@ interface Message {
  * Structure for normalized AI responses.
  */
 interface AIResponse {
-  type: "chat" | "goal" | "task";
+  type: "chat" | "goal" | "task" | "information";
   reply: string;
   intent: {
     operation?: "add" | "delete" | "retry" | "complete";
     data?: {
+      query?: string;
       goal?: string;
       context?: string;
       name?: string;
@@ -133,12 +134,12 @@ export default function AIChat({ setRefresh }: AIChatProps): React.ReactElement 
       return;
     }
 
-    // INFORMATION (NEW)
+    // INFORMATION
     if (type === "information") {
       try {
-        const getTasks = (key) => JSON.parse(localStorage.getItem(key) || "[]");
+        const getTasks = (key:any) => JSON.parse(localStorage.getItem(key) || "[]");
 
-        const formatTask = (t) => `${t.name}${t.dueDate ? ` (${t.dueDate}${t.dueTime ? ' ' + t.dueTime : ''})` : ''}`;
+        const formatTask = (t:any) => `${t.name}${t.dueDate ? ` (${t.dueDate}${t.dueTime ? ' ' + t.dueTime : ''})` : ''}`;
 
         const runningTasks = getTasks("runningTasks").map(formatTask);
         const dueTasks = getTasks("dueTasks").map(formatTask);
